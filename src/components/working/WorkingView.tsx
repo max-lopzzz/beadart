@@ -78,6 +78,17 @@ export function WorkingView({
               onChange={(e) => toggleColorCompleted(pattern.id, color.name, e.target.checked)}
             />
             <button onClick={() => setActiveColor((prev) => (prev === color.name ? null : color.name))}>
+              <span
+                aria-hidden="true"
+                data-hex={color.hex}
+                style={{
+                  display: 'inline-block',
+                  width: 12,
+                  height: 12,
+                  marginRight: 4,
+                  backgroundColor: color.hex,
+                }}
+              />
               {color.name} × {color.count}
             </button>
           </li>

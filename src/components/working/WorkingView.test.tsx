@@ -74,6 +74,19 @@ describe('WorkingView', () => {
     expect(screen.getByLabelText('cell 0-1, color Blue')).toHaveAttribute('data-dimmed', 'true');
   });
 
+  it('shows a color swatch for each color in the sidebar', async () => {
+    await savePalette(palette);
+    await savePattern(pattern);
+    render(<WorkingView patternId="pattern-1" onBack={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('Red × 1'));
+    const redSwatch = screen.getByText('Red × 1').querySelector('[data-hex]');
+    expect(redSwatch).toHaveAttribute('data-hex', '#ff0000');
+
+    const blueSwatch = screen.getByText('Blue × 1').querySelector('[data-hex]');
+    expect(blueSwatch).toHaveAttribute('data-hex', '#0000ff');
+  });
+
   it('calls renderExport with the active color filter when Export is clicked', async () => {
     await savePalette(palette);
     await savePattern(pattern);
