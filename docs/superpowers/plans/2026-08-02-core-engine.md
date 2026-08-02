@@ -1052,6 +1052,10 @@ function detectBlockWidth(image: ImageBuffer): number | null {
     if (changeCounts[x] >= threshold) boundaries.push(x);
   }
   boundaries.push(image.width);
+  // No interior boundaries found (only the start/end sentinels) means no
+  // grid was detected at all — fall back to null instead of reporting the
+  // whole image as a single block.
+  if (boundaries.length <= 2) return null;
   return mode(gapsFromBoundaries(boundaries));
 }
 
@@ -1070,6 +1074,7 @@ function detectBlockHeight(image: ImageBuffer): number | null {
     if (changeCounts[y] >= threshold) boundaries.push(y);
   }
   boundaries.push(image.height);
+  if (boundaries.length <= 2) return null;
   return mode(gapsFromBoundaries(boundaries));
 }
 
