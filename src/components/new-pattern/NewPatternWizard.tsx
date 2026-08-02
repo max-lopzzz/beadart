@@ -45,13 +45,19 @@ export function NewPatternWizard({
 
   if (step.name === 'upload') {
     return (
-      <UploadStep loadImage={loadImage} onImageLoaded={(image) => setStep({ name: 'grid', image })} />
+      <div>
+        <UploadStep loadImage={loadImage} onImageLoaded={(image) => setStep({ name: 'grid', image })} />
+        <button onClick={onCancel}>Cancel</button>
+      </div>
     );
   }
 
   if (step.name === 'grid') {
     return (
-      <GridSizeStep image={step.image} onGridReady={(grid) => setStep({ name: 'palette', grid })} />
+      <div>
+        <GridSizeStep image={step.image} onGridReady={(grid) => setStep({ name: 'palette', grid })} />
+        <button onClick={onCancel}>Cancel</button>
+      </div>
     );
   }
 
@@ -60,11 +66,14 @@ export function NewPatternWizard({
       return <p>No palette available.</p>;
     }
     return (
-      <PaletteAssignStep
-        grid={step.grid}
-        palette={palette}
-        onConfirm={(cellColors) => setStep({ name: 'name', cellColors })}
-      />
+      <div>
+        <PaletteAssignStep
+          grid={step.grid}
+          palette={palette}
+          onConfirm={(cellColors) => setStep({ name: 'name', cellColors })}
+        />
+        <button onClick={onCancel}>Cancel</button>
+      </div>
     );
   }
 
