@@ -6,6 +6,10 @@ describe('hexToRgb', () => {
   it('parses a 6-digit hex color', () => {
     expect(hexToRgb('#ff0000')).toEqual({ r: 255, g: 0, b: 0 });
   });
+
+  it('expands a 3-digit shorthand hex color', () => {
+    expect(hexToRgb('#abc')).toEqual({ r: 170, g: 187, b: 204 });
+  });
 });
 
 describe('findNearestColor', () => {

@@ -2,7 +2,13 @@ import { RGB, rgbToLab, deltaE76 } from './lab';
 import { PaletteColor } from '../../types/palette';
 
 export function hexToRgb(hex: string): RGB {
-  const clean = hex.replace('#', '');
+  let clean = hex.replace('#', '');
+  if (clean.length === 3) {
+    clean = clean
+      .split('')
+      .map((c) => c + c)
+      .join('');
+  }
   return {
     r: parseInt(clean.substring(0, 2), 16),
     g: parseInt(clean.substring(2, 4), 16),
