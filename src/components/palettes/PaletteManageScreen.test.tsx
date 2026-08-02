@@ -19,6 +19,7 @@ describe('PaletteManageScreen', () => {
     render(<PaletteManageScreen onBack={vi.fn()} />);
     await waitFor(() => screen.getByText(/default bead palette/i));
     expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /rename/i })).not.toBeInTheDocument();
   });
 
   it('imports a valid CSV as a new custom palette and lists it', async () => {
