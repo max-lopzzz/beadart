@@ -917,7 +917,13 @@ describe('UploadStep', () => {
     const loadImage = vi.fn().mockRejectedValue(new Error('bad file'));
     render(<UploadStep onImageLoaded={vi.fn()} loadImage={loadImage} />);
 
-    const file = new File(['fake'], 'not-an-image.txt', { type: 'text/plain' });
+    // Use an image-typed fixture, not a .txt/text-plain one: the input below has
+    // accept="image/*", and @testing-library/user-event's upload() silently drops
+    // files that don't match an input's accept attribute (no change event fires
+    // at all) rather than letting the component's own error handling run. The
+    // failure here is meant to come from the mocked rejection, not from MIME
+    // filtering.
+    const file = new File(['fake'], 'corrupted.png', { type: 'image/png' });
     const input = screen.getByLabelText(/upload image/i);
     await userEvent.upload(input, file);
 
@@ -1075,10 +1081,25 @@ interface GridSizeStepProps {
   onGridReady: (grid: RGB[][]) => void;
 }
 
+function parseBlockDimension(raw: string): number {
+  const parsed = parseInt(raw, 10);
+  return Math.max(1, Number.isNaN(parsed) ? 1 : parsed);
+}
+
 export function GridSizeStep({ image, onGridReady }: GridSizeStepProps) {
   const detected = detectBlockSize(image);
-  const [blockWidth, setBlockWidth] = useState(detected?.blockWidth ?? 1);
-  const [blockHeight, setBlockHeight] = useState(detected?.blockHeight ?? 1);
+  // The raw input text is tracked separately from the parsed numeric value so the
+  // field can hold an empty string while the user is clearing/retyping it. Clamping
+  // the value back to a number directly inside onChange (e.g.
+  // `setBlockWidth(Math.max(1, Number(e.target.value) || 1))`) forces a controlled
+  // input's displayed value back to "1" the instant it's cleared, so the next
+  // keystroke appends onto that "1" instead of starting fresh (typing "2" after
+  // clearing becomes "12", not "2").
+  const [blockWidthInput, setBlockWidthInput] = useState(String(detected?.blockWidth ?? 1));
+  const [blockHeightInput, setBlockHeightInput] = useState(String(detected?.blockHeight ?? 1));
+
+  const blockWidth = parseBlockDimension(blockWidthInput);
+  const blockHeight = parseBlockDimension(blockHeightInput);
 
   const cols = Math.ceil(image.width / blockWidth);
   const rows = Math.ceil(image.height / blockHeight);
@@ -1098,19 +1119,19 @@ export function GridSizeStep({ image, onGridReady }: GridSizeStepProps) {
         id="block-width-input"
         type="number"
         min={1}
-        value={blockWidth}
-        onChange={(e) => setBlockWidth(Math.max(1, Number(e.target.value) || 1))}
+        value={blockWidthInput}
+        onChange={(e) => setBlockWidthInput(e.target.value)}
       />
       <label htmlFor="block-height-input">Block height (px)</label>
       <input
         id="block-height-input"
         type="number"
         min={1}
-        value={blockHeight}
-        onChange={(e) => setBlockHeight(Math.max(1, Number(e.target.value) || 1))}
+        value={blockHeightInput}
+        onChange={(e) => setBlockHeightInput(e.target.value)}
       />
       <p>
-        This will create a {rows} × {cols} pattern.
+        This will create a {cols} × {rows} pattern.
       </p>
       <button onClick={handleContinue}>Continue</button>
     </div>
