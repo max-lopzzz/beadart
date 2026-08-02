@@ -23,7 +23,7 @@ describe('UploadStep', () => {
     const loadImage = vi.fn().mockRejectedValue(new Error('bad file'));
     render(<UploadStep onImageLoaded={vi.fn()} loadImage={loadImage} />);
 
-    const file = new File(['fake'], 'not-an-image.txt', { type: 'text/plain' });
+    const file = new File(['fake'], 'corrupted.png', { type: 'image/png' });
     const input = screen.getByLabelText(/upload image/i);
     await userEvent.upload(input, file);
 

@@ -29,6 +29,7 @@ export function UploadStep({ onImageLoaded, loadImage = loadImageBuffer }: Uploa
       <input
         id="upload-image-input"
         type="file"
+        accept="image/*"
         onChange={handleFileChange}
       />
       {error && <p role="alert">{error}</p>}
