@@ -1179,8 +1179,12 @@ export function downsampleToGrid(
   blockWidth: number,
   blockHeight: number,
 ): RGB[][] {
-  const cols = Math.round(image.width / blockWidth);
-  const rows = Math.round(image.height / blockHeight);
+  // Use ceil, not round: rounding down would silently drop the trailing
+  // partial block's pixels when blockWidth/blockHeight doesn't evenly
+  // divide the image. The per-cell Math.min clamps below already handle
+  // that trailing block being smaller than a full block.
+  const cols = Math.ceil(image.width / blockWidth);
+  const rows = Math.ceil(image.height / blockHeight);
   const grid: RGB[][] = [];
 
   for (let row = 0; row < rows; row++) {
