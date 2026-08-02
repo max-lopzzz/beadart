@@ -1645,6 +1645,16 @@ describe('WorkingView', () => {
       'data:image/png;base64,export',
     );
   });
+
+  it('shows a color swatch for each color in the sidebar', async () => {
+    await savePalette(palette);
+    await savePattern(pattern);
+    render(<WorkingView patternId="pattern-1" onBack={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('Red × 1'));
+    const redSwatch = screen.getByText('Red × 1').querySelector('[data-hex]');
+    expect(redSwatch).toHaveAttribute('data-hex', '#ff0000');
+  });
 });
 ```
 
@@ -1736,6 +1746,17 @@ export function WorkingView({
               onChange={(e) => toggleColorCompleted(pattern.id, color.name, e.target.checked)}
             />
             <button onClick={() => setActiveColor((prev) => (prev === color.name ? null : color.name))}>
+              <span
+                aria-hidden="true"
+                data-hex={color.hex}
+                style={{
+                  display: 'inline-block',
+                  width: 12,
+                  height: 12,
+                  marginRight: 4,
+                  backgroundColor: color.hex,
+                }}
+              />
               {color.name} × {color.count}
             </button>
           </li>
@@ -1755,7 +1776,7 @@ export function WorkingView({
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/components/working/WorkingView.test.tsx`
-Expected: PASS (4 tests).
+Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
 
