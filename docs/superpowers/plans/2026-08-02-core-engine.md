@@ -1328,6 +1328,7 @@ const DB_NAME = 'beadart';
 const DB_VERSION = 1;
 
 let dbPromise: Promise<IDBPDatabase<BeadArtDB>> | null = null;
+let dbInstance: IDBPDatabase<BeadArtDB> | null = null;
 
 export function getDb(): Promise<IDBPDatabase<BeadArtDB>> {
   if (!dbPromise) {
@@ -1340,12 +1341,20 @@ export function getDb(): Promise<IDBPDatabase<BeadArtDB>> {
           db.createObjectStore('patterns', { keyPath: 'id' });
         }
       },
+    }).then((db) => {
+      dbInstance = db;
+      return db;
     });
   }
   return dbPromise;
 }
 
 export function resetDbForTests(): void {
+  // indexedDB.deleteDatabase() blocks indefinitely while any connection to
+  // the database remains open, so tests must close the connection before
+  // dropping references to it, not just null out the cached promise.
+  dbInstance?.close();
+  dbInstance = null;
   dbPromise = null;
 }
 ```
