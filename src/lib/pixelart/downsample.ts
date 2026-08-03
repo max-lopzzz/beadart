@@ -49,11 +49,20 @@ export function downsampleToGridByCount(image: ImageBuffer, cols: number, rows: 
 
   for (let row = 0; row < rows; row++) {
     const startY = Math.floor((row * image.height) / rows);
+    // Clamp each end boundary to at least start + 1: if the caller requests more
+    // cols/rows than the image has pixels along that axis, the "natural"
+    // boundary can equal the start boundary, giving a zero-width slice — count
+    // stays 0 and sumR/count becomes NaN. Guaranteeing at least 1 source pixel
+    // per cell means an oversized grid oversamples the same source pixel across
+    // multiple cells instead of producing NaN. The outer Math.min bounds are a
+    // no-op in practice (start+1 and the natural end are always <= the image
+    // dimension) but are kept as a safety net.
     const endY = Math.min(image.height, Math.max(startY + 1, Math.floor(((row + 1) * image.height) / rows)));
     const rowColors: RGB[] = [];
 
     for (let col = 0; col < cols; col++) {
       const startX = Math.floor((col * image.width) / cols);
+      // Same NaN-guard clamp as endY above, applied to the column axis.
       const endX = Math.min(image.width, Math.max(startX + 1, Math.floor(((col + 1) * image.width) / cols)));
 
       let sumR = 0;
