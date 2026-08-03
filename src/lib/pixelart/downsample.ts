@@ -44,6 +44,11 @@ export function downsampleToGrid(
   return grid;
 }
 
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
 export function downsampleToGridByCount(image: ImageBuffer, cols: number, rows: number): RGB[][] {
   const grid: RGB[][] = [];
 
@@ -52,30 +57,55 @@ export function downsampleToGridByCount(image: ImageBuffer, cols: number, rows: 
     // Clamp each end boundary to at least start + 1: if the caller requests more
     // cols/rows than the image has pixels along that axis, the "natural"
     // boundary can equal the start boundary, giving a zero-width slice with no
-    // well-defined center pixel. Guaranteeing at least 1 source pixel per cell
-    // means an oversized grid oversamples the same source pixel across multiple
+    // well-defined sample. Guaranteeing at least 1 source pixel per cell means
+    // an oversized grid oversamples the same source pixel across multiple
     // cells instead of reading out of bounds. The outer Math.min bounds are a
     // no-op in practice (start+1 and the natural end are always <= the image
     // dimension) but are kept as a safety net.
     const endY = Math.min(image.height, Math.max(startY + 1, Math.floor(((row + 1) * image.height) / rows)));
-    const centerY = startY + Math.floor((endY - startY) / 2);
+    const cellHeight = endY - startY;
+    // Sample from the middle 50% of the cell (a quarter-height margin on
+    // each side) so the sampled patch stays clear of a gridline border drawn
+    // around each logical pixel block. For a 1-2px cell there's no room for
+    // a margin, so the patch falls back to the whole cell.
+    const padY = Math.floor(cellHeight * 0.25);
+    const patchStartY = startY + padY;
+    const patchEndY = Math.max(patchStartY + 1, endY - padY);
     const rowColors: RGB[] = [];
 
     for (let col = 0; col < cols; col++) {
       const startX = Math.floor((col * image.width) / cols);
       // Same zero-width guard as endY above, applied to the column axis.
       const endX = Math.min(image.width, Math.max(startX + 1, Math.floor(((col + 1) * image.width) / cols)));
-      const centerX = startX + Math.floor((endX - startX) / 2);
+      const cellWidth = endX - startX;
+      const padX = Math.floor(cellWidth * 0.25);
+      const patchStartX = startX + padX;
+      const patchEndX = Math.max(patchStartX + 1, endX - padX);
 
-      // Sample only the center pixel of the cell rather than averaging the
-      // whole cell: source pixel-art images are often exported with a
-      // gridline border drawn around each logical pixel block, and averaging
-      // would blend that border color into the result.
-      const idx = (centerY * image.width + centerX) * 4;
+      // Take the median of the interior patch rather than a single pixel:
+      // real source images (photographed or screenshotted pixel art, often
+      // JPEG) carry per-pixel compression noise, and a single sampled pixel
+      // can happen to be a noisy outlier that matches a different palette
+      // color than the cell's true, overwhelmingly dominant color. The
+      // median is unaffected as long as noise isn't the majority of the
+      // patch, while still avoiding the gridline border like a single
+      // center-pixel sample would.
+      const rValues: number[] = [];
+      const gValues: number[] = [];
+      const bValues: number[] = [];
+      for (let y = patchStartY; y < patchEndY; y++) {
+        for (let x = patchStartX; x < patchEndX; x++) {
+          const idx = (y * image.width + x) * 4;
+          rValues.push(image.data[idx]);
+          gValues.push(image.data[idx + 1]);
+          bValues.push(image.data[idx + 2]);
+        }
+      }
+
       rowColors.push({
-        r: image.data[idx],
-        g: image.data[idx + 1],
-        b: image.data[idx + 2],
+        r: median(rValues),
+        g: median(gValues),
+        b: median(bValues),
       });
     }
     grid.push(rowColors);

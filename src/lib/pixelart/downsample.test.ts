@@ -85,6 +85,26 @@ function makeCheckerboardWithGridlines(
   return { width, height, data };
 }
 
+function makeSolidColorWithOutlier(
+  width: number,
+  height: number,
+  color: [number, number, number],
+  outlier: { x: number; y: number; color: [number, number, number] },
+): ImageBuffer {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const c = x === outlier.x && y === outlier.y ? outlier.color : color;
+      const idx = (y * width + x) * 4;
+      data[idx] = c[0];
+      data[idx + 1] = c[1];
+      data[idx + 2] = c[2];
+      data[idx + 3] = 255;
+    }
+  }
+  return { width, height, data };
+}
+
 function makeSolidColor(
   width: number,
   height: number,
@@ -140,12 +160,33 @@ describe('downsampleToGrid', () => {
 });
 
 describe('downsampleToGridByCount', () => {
-  it('samples the center pixel of each cell, ignoring gridline-colored borders around each source block', () => {
+  it('is not thrown off by a single noisy outlier pixel landing exactly on the sampled center', () => {
+    // Real photographed/screenshotted source images (e.g. a JPEG export of a
+    // bead pattern) have per-pixel compression noise, and browsers may
+    // additionally color-manage the image (e.g. a Display P3 -> sRGB
+    // conversion), which can push an isolated pixel's color enough to match
+    // a different palette entry than its neighbors. Sampling a single fixed
+    // pixel per cell means that if the noisy pixel happens to land exactly
+    // on the sampled point, the whole cell gets the outlier's color instead
+    // of the cell's true, overwhelmingly dominant color.
+    const image = makeSolidColorWithOutlier(9, 9, [200, 100, 50], {
+      x: 4,
+      y: 4,
+      color: [0, 0, 0],
+    });
+    const grid = downsampleToGridByCount(image, 3, 3);
+    // Cell (1,1) spans x/y [3,6) - its geometric center is exactly (4,4),
+    // the outlier pixel. The other 8 pixels in that cell are the true color.
+    expect(grid[1][1]).toEqual({ r: 200, g: 100, b: 50 });
+  });
+
+  it('samples an interior patch of each cell, ignoring gridline-colored borders around each source block', () => {
     // Real pixel-art source images are often exported with a 1px gridline
     // border drawn around each logical pixel block. Averaging the whole
     // cell (as downsampleToGrid does) blends that border color into the
-    // result; sampling only the center pixel stays inside the fill color
-    // and never touches the border, regardless of the border's color.
+    // result; sampling only the cell's interior (excluding its outer
+    // quarter-margin on each side) stays inside the fill color and never
+    // touches the border, regardless of the border's color.
     const image = makeCheckerboardWithGridlines(5, 2, [0, 0, 0]);
     const grid = downsampleToGridByCount(image, 2, 2);
     expect(grid).toEqual([
@@ -160,7 +201,7 @@ describe('downsampleToGridByCount', () => {
     ]);
   });
 
-  it('samples the center pixel of each cell to a single color, matching downsampleToGrid for an evenly-divisible, border-free case', () => {
+  it('samples each cell to a single color, matching downsampleToGrid for an evenly-divisible, border-free, noise-free case', () => {
     const image = makeCheckerboard(3, 3, 2, 2);
     const grid = downsampleToGridByCount(image, 2, 2);
     expect(grid).toEqual([
@@ -175,16 +216,13 @@ describe('downsampleToGridByCount', () => {
     ]);
   });
 
-  it('produces exactly the requested cols x rows and picks the correct center pixel for a non-evenly-divisible count', () => {
+  it('produces exactly the requested cols x rows and picks the correct interior patch for a non-evenly-divisible count', () => {
     // 9x9 image built from a 3x3 grid of distinct-colored 3x3 blocks,
     // downsampled to a 2x2 grid. 2 doesn't divide 9 evenly, so the cell
-    // boundaries (widths 4 and 5) cut across block boundaries: cell (0,0)
-    // spans x/y [0,4) with center pixel at index 2, still inside block-col/
-    // row 0; cell (1,1) spans x/y [4,9) with center pixel at index 6, inside
-    // block-col/row 2. A boundary-off-by-one bug in the start/end/center
-    // computation would land on a different block and change the sampled
-    // color, so this test can still fail on a partitioning regression even
-    // though it no longer averages.
+    // boundaries (widths 4 and 5) cut across block boundaries. A
+    // boundary-off-by-one bug in the start/end/patch computation would shift
+    // which blocks the patch covers and change the sampled color, so this
+    // test can still fail on a partitioning regression.
     const image = makeDistinctBlockGrid(3, 3);
     const grid = downsampleToGridByCount(image, 2, 2);
 
@@ -192,10 +230,16 @@ describe('downsampleToGridByCount', () => {
     expect(grid[0].length).toBe(2);
     expect(grid[1].length).toBe(2);
 
-    // Expected r values: center pixel (x=2,y=2) falls in block (row 0, col
-    // 0) -> r=0; center (x=6,y=2) falls in block (row 0, col 2) -> r=20;
-    // center (x=2,y=6) falls in block (row 2, col 0) -> r=60; center (x=6,
-    // y=6) falls in block (row 2, col 2) -> r=80.
+    // Expected r values, hand-computed from the block layout above and the
+    // interior-patch (middle 50%, i.e. 1px margin trimmed from a 4-wide cell
+    // and a 5-wide cell) + per-channel-median sampling:
+    // cell(0,0): patch x,y in [1,3) -> entirely block (row 0, col 0) -> r=0
+    // cell(0,1): patch x in [5,8), y in [1,3) -> r values [10,20,20,10,20,20]
+    //   (block col 1 at x=5, block col 2 at x=6,7) -> median = 20
+    // cell(1,0): patch x in [1,3), y in [5,8) -> r values [30,30,60,60,60,60]
+    //   (block row 1 at y=5, block row 2 at y=6,7) -> median = 60
+    // cell(1,1): patch x,y in [5,8) -> r values [40,50,50,70,80,80,70,80,80]
+    //   sorted [40,50,50,70,70,80,80,80,80] -> median (5th of 9) = 70
     expect(grid).toEqual([
       [
         { r: 0, g: 0, b: 0 },
@@ -203,7 +247,7 @@ describe('downsampleToGridByCount', () => {
       ],
       [
         { r: 60, g: 0, b: 0 },
-        { r: 80, g: 0, b: 0 },
+        { r: 70, g: 0, b: 0 },
       ],
     ]);
   });
