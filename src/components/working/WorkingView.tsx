@@ -18,7 +18,7 @@ export function WorkingView({
 }: WorkingViewProps) {
   const { patterns, loading: patternsLoading, toggleColorCompleted } = usePatterns();
   const { palettes, loading: palettesLoading } = usePalettes();
-  const [activeColor, setActiveColor] = useState<string | null>(null);
+  const [activeColors, setActiveColors] = useState<Set<string>>(new Set());
   const [exportUrl, setExportUrl] = useState<string | null>(null);
 
   if (patternsLoading || palettesLoading) {
@@ -36,8 +36,24 @@ export function WorkingView({
   const percent = completionPercent(pattern, palette);
   const hexByName = new Map(palette.colors.map((c) => [c.name, c.hex]));
 
+  const toggleActiveColor = (colorName: string) => {
+    setActiveColors((prev) => {
+      const next = new Set(prev);
+      if (next.has(colorName)) {
+        next.delete(colorName);
+      } else {
+        next.add(colorName);
+      }
+      return next;
+    });
+  };
+
   const handleExport = () => {
-    setExportUrl(renderExport(pattern, palette, { onlyColor: activeColor ?? undefined }));
+    setExportUrl(
+      renderExport(pattern, palette, {
+        onlyColors: activeColors.size > 0 ? Array.from(activeColors) : undefined,
+      }),
+    );
   };
 
   return (
@@ -61,7 +77,7 @@ export function WorkingView({
               {pattern.cellColors.map((row, rowIndex) => (
                 <tr key={rowIndex}>
                   {row.map((colorName, colIndex) => {
-                    const dimmed = activeColor !== null && colorName !== activeColor;
+                    const dimmed = activeColors.size > 0 && !activeColors.has(colorName);
                     return (
                       <td key={colIndex}>
                         <div
@@ -83,9 +99,19 @@ export function WorkingView({
           </table>
         </div>
         <div className="surface" style={{ padding: 'var(--space-3)' }}>
+          <div className="legend-header">
+            <p className="hint" style={{ margin: 0 }}>
+              Click one or more colors to show only those.
+            </p>
+            {activeColors.size > 0 && (
+              <button className="btn btn-ghost btn-sm" onClick={() => setActiveColors(new Set())}>
+                Show all
+              </button>
+            )}
+          </div>
           <ul className="legend-list">
             {counts.map((color) => {
-              const isActive = activeColor === color.name;
+              const isActive = activeColors.has(color.name);
               return (
                 <li key={color.name} className="legend-row">
                   <input
@@ -97,9 +123,7 @@ export function WorkingView({
                   <button
                     className="legend-swatch-btn"
                     data-active={isActive ? 'true' : 'false'}
-                    onClick={() =>
-                      setActiveColor((prev) => (prev === color.name ? null : color.name))
-                    }
+                    onClick={() => toggleActiveColor(color.name)}
                   >
                     <span
                       className="bead bead-sm"

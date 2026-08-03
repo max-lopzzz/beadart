@@ -74,6 +74,32 @@ describe('WorkingView', () => {
     expect(screen.getByLabelText('cell 0-1, color Blue')).toHaveAttribute('data-dimmed', 'true');
   });
 
+  it('shows multiple colors at once when more than one is selected', async () => {
+    await savePalette(palette);
+    await savePattern(pattern);
+    render(<WorkingView patternId="pattern-1" onBack={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('Red × 1'));
+    await userEvent.click(screen.getByText('Red × 1'));
+    await userEvent.click(screen.getByText('Blue × 1'));
+
+    expect(screen.getByLabelText('cell 0-0, color Red')).toHaveAttribute('data-dimmed', 'false');
+    expect(screen.getByLabelText('cell 0-1, color Blue')).toHaveAttribute('data-dimmed', 'false');
+  });
+
+  it('clears the filter when a selected color is clicked again', async () => {
+    await savePalette(palette);
+    await savePattern(pattern);
+    render(<WorkingView patternId="pattern-1" onBack={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('Red × 1'));
+    await userEvent.click(screen.getByText('Red × 1'));
+    await userEvent.click(screen.getByText('Red × 1'));
+
+    expect(screen.getByLabelText('cell 0-0, color Red')).toHaveAttribute('data-dimmed', 'false');
+    expect(screen.getByLabelText('cell 0-1, color Blue')).toHaveAttribute('data-dimmed', 'false');
+  });
+
   it('shows a color swatch for each color in the sidebar', async () => {
     await savePalette(palette);
     await savePattern(pattern);
@@ -97,7 +123,7 @@ describe('WorkingView', () => {
     await userEvent.click(screen.getByText('Red × 1'));
     await userEvent.click(screen.getByRole('button', { name: /export image/i }));
 
-    expect(renderExport).toHaveBeenCalledWith(pattern, palette, { onlyColor: 'Red' });
+    expect(renderExport).toHaveBeenCalledWith(pattern, palette, { onlyColors: ['Red'] });
     expect(screen.getByRole('link', { name: /download image/i })).toHaveAttribute(
       'href',
       'data:image/png;base64,export',

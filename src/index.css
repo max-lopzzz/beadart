@@ -480,12 +480,7 @@ label {
 }
 
 .pattern-card {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  text-align: left;
-  padding: var(--space-3);
-  gap: var(--space-3);
+  position: relative;
   border: 1px solid var(--border);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
@@ -493,6 +488,64 @@ label {
 .pattern-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+}
+
+.pattern-card-open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  width: 100%;
+  padding: var(--space-3);
+  gap: var(--space-3);
+}
+
+.pattern-card-delete {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+}
+
+.btn-icon-danger {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-icon-danger:hover {
+  background: var(--danger-surface);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.pattern-card-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.pattern-card-confirm-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+}
+
+.btn-danger:hover {
+  opacity: 0.88;
 }
 
 .pattern-card-thumb {
@@ -717,6 +770,14 @@ label {
 .pixel-cell {
   border: 1px solid rgba(0, 0, 0, 0.08);
   transition: opacity 0.15s ease;
+}
+
+.legend-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .legend-list {

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { usePatterns } from '../../hooks/usePatterns';
 import { usePalettes } from '../../hooks/usePalettes';
 import { completionPercent } from '../../lib/pattern/patternStats';
@@ -27,8 +28,9 @@ function WordmarkIcon({ size = 32 }: { size?: number }) {
 }
 
 export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: HomeScreenProps) {
-  const { patterns, loading: patternsLoading } = usePatterns();
+  const { patterns, loading: patternsLoading, removePattern } = usePatterns();
   const { palettes, loading: palettesLoading } = usePalettes();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   if (patternsLoading || palettesLoading) {
     return <div>Loading...</div>;
@@ -63,31 +65,66 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
           {patterns.map((pattern) => {
             const palette = palettes.find((p) => p.id === pattern.paletteId);
             const percent = palette ? completionPercent(pattern, palette) : 0;
+            const isDeleting = deletingId === pattern.id;
             return (
-              <button
-                key={pattern.id}
-                className="surface pattern-card"
-                onClick={() => onOpenPattern(pattern.id)}
-              >
-                {pattern.thumbnail ? (
-                  <img
-                    className="pattern-card-thumb"
-                    src={pattern.thumbnail}
-                    alt={pattern.name}
-                    width={80}
-                    height={80}
-                  />
+              <div key={pattern.id} className="surface pattern-card">
+                <button
+                  className="pattern-card-open"
+                  onClick={() => onOpenPattern(pattern.id)}
+                >
+                  {pattern.thumbnail ? (
+                    <img
+                      className="pattern-card-thumb"
+                      src={pattern.thumbnail}
+                      alt={pattern.name}
+                      width={80}
+                      height={80}
+                    />
+                  ) : (
+                    <div className="pattern-card-thumb-placeholder" />
+                  )}
+                  <div className="pattern-card-footer">
+                    <span className="pattern-card-name">{pattern.name}</span>
+                    <ProgressRing percent={percent} size={32} thickness={3} />
+                  </div>
+                  <span
+                    className="mono"
+                    style={{ fontSize: 'var(--text-xs)', color: 'var(--ink-muted)' }}
+                  >
+                    {percent}% complete
+                  </span>
+                </button>
+                {isDeleting ? (
+                  <div className="pattern-card-confirm">
+                    <span>Delete this pattern?</span>
+                    <div className="pattern-card-confirm-actions">
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setDeletingId(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={async () => {
+                          await removePattern(pattern.id);
+                          setDeletingId(null);
+                        }}
+                      >
+                        Delete forever
+                      </button>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="pattern-card-thumb-placeholder" />
+                  <button
+                    className="btn-icon-danger pattern-card-delete"
+                    aria-label={`Delete ${pattern.name}`}
+                    onClick={() => setDeletingId(pattern.id)}
+                  >
+                    ✕
+                  </button>
                 )}
-                <div className="pattern-card-footer">
-                  <span className="pattern-card-name">{pattern.name}</span>
-                  <ProgressRing percent={percent} size={32} thickness={3} />
-                </div>
-                <span className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--ink-muted)' }}>
-                  {percent}% complete
-                </span>
-              </button>
+              </div>
             );
           })}
         </div>

@@ -6,7 +6,7 @@ const CELL_SIZE_PX = 20;
 export function renderPatternToDataUrl(
   pattern: Pattern,
   palette: Palette,
-  options: { onlyColor?: string; maxSize?: number } = {},
+  options: { onlyColors?: string[]; maxSize?: number } = {},
 ): string {
   const canvas = document.createElement('canvas');
   canvas.width = pattern.cols * CELL_SIZE_PX;
@@ -21,7 +21,7 @@ export function renderPatternToDataUrl(
   for (let row = 0; row < pattern.rows; row++) {
     for (let col = 0; col < pattern.cols; col++) {
       const colorName = pattern.cellColors[row][col];
-      const isDimmed = options.onlyColor !== undefined && colorName !== options.onlyColor;
+      const isDimmed = !!options.onlyColors?.length && !options.onlyColors.includes(colorName);
       ctx.fillStyle = isDimmed ? '#e0e0e0' : (hexByName.get(colorName) ?? '#000000');
       ctx.fillRect(col * CELL_SIZE_PX, row * CELL_SIZE_PX, CELL_SIZE_PX, CELL_SIZE_PX);
     }
