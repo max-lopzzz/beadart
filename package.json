@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "postinstall": "cp node_modules/@techstark/opencv-js/dist/opencv.js public/opencv.js"
+    "postinstall": "mkdir -p public && cp node_modules/@techstark/opencv-js/dist/opencv.js public/opencv.js"
   },
   "dependencies": {
     "@techstark/opencv-js": "^4.10.0-release.1",
