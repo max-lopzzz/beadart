@@ -23,14 +23,20 @@
 
 **Files:**
 - Modify: `package.json`
+- Modify: `.gitignore`
 - Create: `src/lib/photo/opencv.ts`
+- Create (gitignored, regenerated on `npm install`): `public/opencv.js`
 
 **Interfaces:**
-- Produces: `loadOpenCv(): Promise<OpenCvModule>` — a memoized loader that dynamically imports `@techstark/opencv-js` and resolves once its WASM runtime has finished initializing. Used by Task 4 (`cornerDetect.ts`) and Task 5 (`perspectiveWarp.ts`).
+- Produces: `loadOpenCv(): Promise<OpenCvModule>` — a memoized loader that appends a `<script>` tag for the vendored `/opencv.js` static asset and resolves once its WASM runtime has finished initializing. Used by Task 4 (`cornerDetect.ts`) and Task 5 (`perspectiveWarp.ts`).
 
-This task has no automated test — loading and initializing a real WASM module is exactly the kind of browser-only side effect this plan's Global Constraints exclude from Vitest coverage. Instead, verify it manually (see Step 3) so a wrong assumption about the package's ready-detection API is caught here, immediately, rather than surfacing later as a confusing failure in Task 4 or 5.
+**Important — this task's original design (dynamic `import('@techstark/opencv-js')`) does not work and must not be used.** During this task's own manual verification, `import('@techstark/opencv-js')` was found to hang indefinitely — never resolving, never throwing — when loaded through Vite's dependency pre-bundling (esbuild). The Emscripten-generated UMD/CJS glue code's Node-vs-browser environment detection appears to misfire under esbuild's CJS interop shims (consistent with `vite build` separately warning that this package's `fs`/`path`/`crypto` requires were "externalized for browser compatibility" — a sign the bundler is treating parts of it as Node-targeted code). This was confirmed by isolating the exact same `opencv.js` file in a minimal static HTML page with a plain `<script>` tag, which resolved in under a second — proving the OpenCV.js build itself and the ready-detection logic are both fine; only loading it *through the bundler's module system* is broken.
 
-- [ ] **Step 1: Add the dependency**
+**The fix, and what this task actually builds:** vendor the compiled `opencv.js` (from `node_modules/@techstark/opencv-js/dist/opencv.js`) as a static asset at `public/opencv.js`, regenerated automatically by a `postinstall` script on every `npm install` (not committed to git — same treatment as `node_modules`, since it's a deterministic byproduct of the pinned dependency version) — and load it at runtime by appending a real `<script>` element to `document.head`, never via `import()`. The `@techstark/opencv-js` npm dependency is kept only as the pinned source `postinstall` copies from; nothing in the app imports it as a module.
+
+This task has no automated test — loading and initializing a real WASM module is exactly the kind of browser-only side effect this plan's Global Constraints exclude from Vitest coverage. Instead, verify it manually (see Step 5) — this is what caught the `import()` hang above before Tasks 4/5/7 could be built on top of a broken foundation.
+
+- [ ] **Step 1: Add the dependency and postinstall script**
 
 Add to `package.json`'s `dependencies` (alongside the existing entries):
 
@@ -38,59 +44,112 @@ Add to `package.json`'s `dependencies` (alongside the existing entries):
     "@techstark/opencv-js": "^4.10.0-release.1"
 ```
 
-Run: `npm install`
+Add a `postinstall` script to `package.json`'s `scripts` (alongside the existing entries):
+
+```json
+    "postinstall": "cp node_modules/@techstark/opencv-js/dist/opencv.js public/opencv.js"
+```
+
+Add `public/opencv.js` to `.gitignore` (alongside the existing entries):
+
+```
+public/opencv.js
+```
+
+Run: `npm install` (this both installs the dependency and runs the new `postinstall` script, which should copy the file into place)
+
+Expected: `ls public/opencv.js` shows a ~10MB file now exists.
 
 - [ ] **Step 2: Create `src/lib/photo/opencv.ts`**
 
 ```typescript
-// OpenCvModule is intentionally loosely typed: @techstark/opencv-js's shipped
-// types cover most of the OpenCV API but not every method this plan uses, and
-// this whole module is a browser/WASM adapter with no automated test coverage
-// (see Global Constraints) — callers should treat it as `any`-shaped and rely
-// on manual verification, not the type checker, to catch misuse here.
-type OpenCvModule = typeof import('@techstark/opencv-js');
+// OpenCvModule is intentionally loosely typed: this whole module is a
+// browser/WASM adapter with no automated test coverage (see Global
+// Constraints) — callers should treat it as `any`-shaped and rely on manual
+// verification, not the type checker, to catch misuse here.
+type OpenCvModule = any;
+
+// Loaded via a plain <script> tag against the vendored /opencv.js static
+// asset (see public/opencv.js), NOT via `import('@techstark/opencv-js')`.
+// A dynamic import of that package hangs indefinitely when it goes through
+// Vite's dependency pre-bundling (esbuild) — the Emscripten-generated
+// UMD/CJS glue code's Node-vs-browser environment detection appears to
+// misfire under esbuild's CJS interop shims (Vite's build step separately
+// externalizes this package's `fs`/`path`/`crypto` requires for browser
+// compatibility, which are consistent with it taking a broken Node-style
+// code path). Loading the same file via a real <script> tag — bypassing
+// the bundler's module system entirely — was verified to work reliably.
+const OPENCV_SCRIPT_URL = '/opencv.js';
 
 let cvPromise: Promise<OpenCvModule> | null = null;
 
 export function loadOpenCv(): Promise<OpenCvModule> {
   if (!cvPromise) {
-    cvPromise = import('@techstark/opencv-js').then(
-      (mod) =>
-        new Promise<OpenCvModule>((resolve) => {
-          const cv = (mod as { default?: OpenCvModule }).default ?? (mod as unknown as OpenCvModule);
-          // Some builds finish initializing before this callback is even
-          // attached (e.g. if a previous call already resolved cvPromise and
-          // the WASM runtime was cached); guard for that rather than hanging.
-          if ((cv as unknown as { Mat?: unknown }).Mat) {
-            resolve(cv);
-          } else {
-            (cv as unknown as { onRuntimeInitialized: () => void }).onRuntimeInitialized = () =>
-              resolve(cv);
-          }
-        }),
-    );
+    cvPromise = new Promise<OpenCvModule>((resolve, reject) => {
+      const existing = (window as unknown as { cv?: OpenCvModule }).cv;
+      if (existing && existing.Mat) {
+        resolve(existing);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = OPENCV_SCRIPT_URL;
+      script.onerror = () => reject(new Error(`loadOpenCv: failed to load ${OPENCV_SCRIPT_URL}`));
+      script.onload = () => {
+        const cv = (window as unknown as { cv?: OpenCvModule }).cv;
+        if (!cv) {
+          reject(new Error('loadOpenCv: script loaded but did not set window.cv'));
+          return;
+        }
+        if (cv.Mat) {
+          resolve(cv);
+        } else {
+          cv.onRuntimeInitialized = () => resolve(cv);
+        }
+      };
+      document.head.appendChild(script);
+    });
   }
   return cvPromise;
 }
 ```
 
-- [ ] **Step 3: Manually verify the loader resolves with a working OpenCV module**
+- [ ] **Step 3: Verify the project still compiles and the existing suite passes**
 
-Run: `npm run dev`, then open the dev server in a browser and run this in the browser console (temporarily paste it into any component's `useEffect` if console access to app modules isn't convenient, or add a throwaway `console.log` call in `main.tsx` and remove it after):
+Run: `npx tsc -b && npm test`
+Expected: no type errors; all existing tests (70 at this point) still pass (this task adds no new automated tests of its own).
 
-```javascript
-import('/src/lib/photo/opencv.ts').then(({ loadOpenCv }) =>
-  loadOpenCv().then((cv) => console.log('OpenCV ready:', typeof cv.Mat, typeof cv.imread)),
-);
+- [ ] **Step 4: Verify the production build includes the vendored asset**
+
+Run: `npm run build && ls dist/opencv.js`
+Expected: build succeeds, and `dist/opencv.js` exists (Vite copies everything under `public/` verbatim into `dist/`) — this is what the real deployed app will serve.
+
+- [ ] **Step 5: Manually verify the loader resolves with a working OpenCV module in a real browser**
+
+Run: `npm run dev`, open the dev server in a browser, and temporarily add this to `src/main.tsx` (above the `createRoot(...)` call), then remove it once verified:
+
+```typescript
+import { loadOpenCv } from './lib/photo/opencv';
+
+loadOpenCv()
+  .then((cv) =>
+    console.log(
+      'OpenCV ready: Mat=' + typeof cv.Mat + ' imread=' + typeof cv.imread +
+      ' matFromImageData=' + typeof cv.matFromImageData + ' Canny=' + typeof cv.Canny +
+      ' getPerspectiveTransform=' + typeof cv.getPerspectiveTransform +
+      ' warpPerspective=' + typeof cv.warpPerspective,
+    ),
+  )
+  .catch((err) => console.error('OpenCV load failed:', err));
 ```
 
-Expected: within a few seconds, the console logs `OpenCV ready: function function` (confirming `cv.Mat` and `cv.imread` are real, callable exports — not `undefined`). If this fails or hangs, the ready-detection logic in Step 2 needs adjusting to match the installed package version's actual API (check its README/type definitions in `node_modules/@techstark/opencv-js`) — fix it here before proceeding, since Tasks 4 and 5 both depend on this loader working correctly.
+Expected: the console logs `OpenCV ready: Mat=function imread=function matFromImageData=function Canny=function getPerspectiveTransform=function warpPerspective=function` — confirming every OpenCV method Tasks 4 and 5 need is present and callable. If this doesn't appear within a reasonable time, or the browser tab becomes unresponsive, do not assume the fix is broken without further isolation — cross-check against a minimal static HTML page loading the same `public/opencv.js` via a plain `<script>` tag outside of Vite/React entirely (this was how the `import()` hang was originally distinguished from a real OpenCV.js problem). If that isolated test also fails, the loader itself needs further investigation; if it succeeds while the in-app test doesn't, the discrepancy may be specific to the test environment rather than the code, and can reasonably be deferred to Task 9's full end-to-end verification once the whole photo path exists to exercise it through real user interaction.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add package.json package-lock.json src/lib/photo/opencv.ts
-git commit -m "feat: add OpenCV.js dependency and lazy-loading wrapper"
+git add .gitignore package.json package-lock.json src/lib/photo/opencv.ts
+git commit -m "feat: add OpenCV.js dependency and vendored script-tag loader"
 ```
 
 ---
@@ -1348,7 +1407,7 @@ git commit -m "feat: add source-type selection and photo corner-detection branch
 
 **Interfaces:** none — this task exercises the whole photo path built by Tasks 1-8 through a real browser, including every OpenCV.js-dependent piece (`loadOpenCv`, `detectCorners`, `warpPerspective`) that has no automated test coverage per this plan's Global Constraints.
 
-This is the one task in this plan that isn't TDD — it's the safety net for the entire OpenCV-dependent subsystem. The same approach (manual browser verification as the final task, no code changes expected) was used for the Digital App UI plan's canvas adapters and passed cleanly on the first try; this task follows the same pattern for the harder photo/corner-detection path.
+This is the one task in this plan that isn't TDD — it's the safety net for the entire OpenCV-dependent subsystem. The same approach (manual browser verification as the final task, no code changes expected) was used for the Digital App UI plan's canvas adapters and passed cleanly on the first try; this task follows the same pattern for the harder photo/corner-detection path. Note that Task 1's own manual verification already surfaced and fixed one real bug in this subsystem (the OpenCV.js loading approach) — this task is the point where that fix, plus everything built on top of it, gets exercised together for the first time through actual user interaction.
 
 - [ ] **Step 1: Create a synthetic "photo" test image**
 
