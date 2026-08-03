@@ -112,4 +112,20 @@ describe('downsampleToGridByCount', () => {
       }
     }
   });
+
+  it('does not produce NaN cells when the requested grid is larger than the source image', () => {
+    // 2x2 image with a 3x3 requested grid: some columns/rows have startX === endX
+    // (or startY === endY) under the naive Math.floor boundaries, which previously
+    // caused count to stay 0 and sumR/count etc. to evaluate to NaN.
+    const image = makeSolidColor(2, 2, [50, 60, 70]);
+    const grid = downsampleToGridByCount(image, 3, 3);
+
+    expect(grid.length).toBe(3);
+    for (const row of grid) {
+      expect(row.length).toBe(3);
+      for (const cell of row) {
+        expect(cell).toEqual({ r: 50, g: 60, b: 70 });
+      }
+    }
+  });
 });

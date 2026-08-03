@@ -49,12 +49,12 @@ export function downsampleToGridByCount(image: ImageBuffer, cols: number, rows: 
 
   for (let row = 0; row < rows; row++) {
     const startY = Math.floor((row * image.height) / rows);
-    const endY = Math.floor(((row + 1) * image.height) / rows);
+    const endY = Math.min(image.height, Math.max(startY + 1, Math.floor(((row + 1) * image.height) / rows)));
     const rowColors: RGB[] = [];
 
     for (let col = 0; col < cols; col++) {
       const startX = Math.floor((col * image.width) / cols);
-      const endX = Math.floor(((col + 1) * image.width) / cols);
+      const endX = Math.min(image.width, Math.max(startX + 1, Math.floor(((col + 1) * image.width) / cols)));
 
       let sumR = 0;
       let sumG = 0;
