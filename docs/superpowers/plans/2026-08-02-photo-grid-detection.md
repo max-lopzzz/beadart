@@ -1323,11 +1323,14 @@ export function NewPatternWizard({
   const [step, setStep] = useState<WizardStep>({ name: 'source-type' });
   const [patternName, setPatternName] = useState('');
 
-  if (palettesLoading) {
-    return <div>Loading...</div>;
-  }
-
-  const palette = palettes.find((p) => p.isBuiltIn) ?? palettes[0];
+  // The palettesLoading/palette gate deliberately sits AFTER the
+  // source-type/upload/grid/corners branches below, not before them: none
+  // of those earlier steps read palette data, so there's no reason to block
+  // them on an unrelated async fetch. Placing the gate at the very top (an
+  // earlier version of this component did) makes the wizard show a generic
+  // "Loading..." screen on every mount regardless of step, since
+  // usePalettes()'s `loading` starts `true` and only flips via an async
+  // effect — the source-type step would never render synchronously.
 
   if (step.name === 'source-type') {
     return (
@@ -1376,6 +1379,12 @@ export function NewPatternWizard({
       </div>
     );
   }
+
+  if (palettesLoading) {
+    return <div>Loading...</div>;
+  }
+
+  const palette = palettes.find((p) => p.isBuiltIn) ?? palettes[0];
 
   if (step.name === 'palette') {
     if (!palette) {
