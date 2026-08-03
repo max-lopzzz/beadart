@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { downsampleToGrid } from './downsample';
+import { downsampleToGrid, downsampleToGridByCount } from './downsample';
 import { ImageBuffer } from './blockDetect';
 
 function makeCheckerboard(
@@ -79,6 +79,36 @@ describe('downsampleToGrid', () => {
     for (let row = 0; row < 3; row++) {
       for (let col = 0; col < 3; col++) {
         expect(grid[row][col]).toEqual({ r: 100, g: 150, b: 200 });
+      }
+    }
+  });
+});
+
+describe('downsampleToGridByCount', () => {
+  it('averages each cell to a single color, matching downsampleToGrid for an evenly-divisible case', () => {
+    const image = makeCheckerboard(3, 3, 2, 2);
+    const grid = downsampleToGridByCount(image, 2, 2);
+    expect(grid).toEqual([
+      [
+        { r: 255, g: 0, b: 0 },
+        { r: 0, g: 0, b: 255 },
+      ],
+      [
+        { r: 0, g: 0, b: 255 },
+        { r: 255, g: 0, b: 0 },
+      ],
+    ]);
+  });
+
+  it('produces exactly the requested cols x rows with no dropped or duplicated pixels for a non-evenly-divisible count', () => {
+    const image = makeSolidColor(10, 10, [100, 150, 200]);
+    const grid = downsampleToGridByCount(image, 3, 3);
+
+    expect(grid.length).toBe(3);
+    for (const row of grid) {
+      expect(row.length).toBe(3);
+      for (const cell of row) {
+        expect(cell).toEqual({ r: 100, g: 150, b: 200 });
       }
     }
   });
