@@ -27,7 +27,7 @@ describe('App', () => {
     await waitFor(() => screen.getByRole('button', { name: /new pattern/i }));
     await userEvent.click(screen.getByRole('button', { name: /new pattern/i }));
 
-    await waitFor(() => screen.getByRole('button', { name: /digital pixel art image/i }));
+    await waitFor(() => screen.getByLabelText(/upload image/i));
     await userEvent.click(screen.getByRole('button', { name: /cancel/i }));
 
     await waitFor(() => expect(screen.getByText(/no patterns yet/i)).toBeInTheDocument());

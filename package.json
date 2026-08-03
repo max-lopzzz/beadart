@@ -8,11 +8,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "postinstall": "mkdir -p public && cp node_modules/@techstark/opencv-js/dist/opencv.js public/opencv.js"
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@techstark/opencv-js": "^4.10.0-release.1",
     "idb": "^8.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
