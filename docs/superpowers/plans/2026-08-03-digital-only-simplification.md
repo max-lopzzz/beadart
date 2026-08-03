@@ -371,6 +371,23 @@ describe('downsampleToGridByCount', () => {
       }
     }
   });
+
+  it('oversamples rather than producing NaN when the requested grid is larger than the source image', () => {
+    // Without clamping each cell's pixel range to at least 1 real pixel,
+    // requesting more cols/rows than the image has pixels along that axis
+    // gives a zero-width slice for some cells (count stays 0, sumR/count
+    // becomes NaN). Every cell must still resolve to a real color.
+    const image = makeSolidColor(2, 2, [50, 60, 70]);
+    const grid = downsampleToGridByCount(image, 3, 3);
+
+    expect(grid.length).toBe(3);
+    for (const row of grid) {
+      expect(row.length).toBe(3);
+      for (const cell of row) {
+        expect(cell).toEqual({ r: 50, g: 60, b: 70 });
+      }
+    }
+  });
 });
 ```
 
@@ -388,13 +405,19 @@ export function downsampleToGridByCount(image: ImageBuffer, cols: number, rows: 
   const grid: RGB[][] = [];
 
   for (let row = 0; row < rows; row++) {
+    // Clamp each end boundary to at least startX/startY + 1: if the caller
+    // requests more cols/rows than the image has pixels along that axis, the
+    // "natural" boundary can equal the start boundary, giving a zero-width
+    // slice — count stays 0 and sumR/count becomes NaN. Guaranteeing at
+    // least 1 source pixel per cell means an oversized grid oversamples the
+    // same source pixel across multiple cells instead of producing NaN.
     const startY = Math.floor((row * image.height) / rows);
-    const endY = Math.floor(((row + 1) * image.height) / rows);
+    const endY = Math.min(image.height, Math.max(startY + 1, Math.floor(((row + 1) * image.height) / rows)));
     const rowColors: RGB[] = [];
 
     for (let col = 0; col < cols; col++) {
       const startX = Math.floor((col * image.width) / cols);
-      const endX = Math.floor(((col + 1) * image.width) / cols);
+      const endX = Math.min(image.width, Math.max(startX + 1, Math.floor(((col + 1) * image.width) / cols)));
 
       let sumR = 0;
       let sumG = 0;
@@ -426,7 +449,7 @@ export function downsampleToGridByCount(image: ImageBuffer, cols: number, rows: 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/lib/pixelart/downsample.test.ts`
-Expected: PASS (4 tests: the 2 existing `downsampleToGrid` tests + the 2 new ones).
+Expected: PASS (5 tests: the 2 existing `downsampleToGrid` tests + the 3 new ones).
 
 - [ ] **Step 5: Commit**
 
