@@ -14,6 +14,23 @@ interface SelectedCell {
   col: number;
 }
 
+const CELL_SIZE_PX = 28;
+
+function hexToRgbChannels(hex: string): [number, number, number] {
+  const clean = hex.replace('#', '');
+  return [
+    parseInt(clean.substring(0, 2), 16),
+    parseInt(clean.substring(2, 4), 16),
+    parseInt(clean.substring(4, 6), 16),
+  ];
+}
+
+function contrastTextColor(hex: string): string {
+  const [r, g, b] = hexToRgbChannels(hex);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance >= 0.5 ? '#000000' : '#ffffff';
+}
+
 export function PaletteAssignStep({ grid, palette, onConfirm }: PaletteAssignStepProps) {
   const [cellColors, setCellColors] = useState<string[][]>(() =>
     buildCellColors(grid, palette.colors),
@@ -39,15 +56,30 @@ export function PaletteAssignStep({ grid, palette, onConfirm }: PaletteAssignSte
         <tbody>
           {cellColors.map((row, rowIndex) => (
             <tr key={rowIndex}>
-              {row.map((colorName, colIndex) => (
-                <td key={colIndex}>
-                  <button
-                    aria-label={`cell ${rowIndex}-${colIndex}, color ${colorName}`}
-                    style={{ backgroundColor: hexByName.get(colorName) }}
-                    onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
-                  />
-                </td>
-              ))}
+              {row.map((colorName, colIndex) => {
+                const hex = hexByName.get(colorName) ?? '#000000';
+                const textColor = contrastTextColor(hex);
+                return (
+                  <td key={colIndex}>
+                    <button
+                      aria-label={`cell ${rowIndex}-${colIndex}, color ${colorName}`}
+                      data-text-color={textColor}
+                      onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
+                      style={{
+                        width: CELL_SIZE_PX,
+                        height: CELL_SIZE_PX,
+                        padding: 0,
+                        border: '1px solid #999',
+                        backgroundColor: hex,
+                        color: textColor,
+                        fontSize: 9,
+                      }}
+                    >
+                      {colorName}
+                    </button>
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>

@@ -41,4 +41,40 @@ describe('PaletteAssignStep', () => {
 
     expect(onConfirm).toHaveBeenCalledWith([['Blue', 'Blue']]);
   });
+
+  it('shows the color code as visible text on each square cell', () => {
+    render(<PaletteAssignStep grid={grid} palette={palette} onConfirm={vi.fn()} />);
+
+    const redCell = screen.getByLabelText('cell 0-0, color Red');
+    expect(redCell).toHaveTextContent('Red');
+    expect(redCell).toHaveStyle({ width: '28px', height: '28px' });
+  });
+
+  it('uses dark text on a light background and light text on a dark background', () => {
+    const bwPalette: Palette = {
+      id: 'p2',
+      name: 'BW',
+      isBuiltIn: false,
+      colors: [
+        { name: 'White', hex: '#ffffff' },
+        { name: 'Black', hex: '#000000' },
+      ],
+    };
+    const bwGrid: RGB[][] = [
+      [
+        { r: 255, g: 255, b: 255 },
+        { r: 0, g: 0, b: 0 },
+      ],
+    ];
+    render(<PaletteAssignStep grid={bwGrid} palette={bwPalette} onConfirm={vi.fn()} />);
+
+    expect(screen.getByLabelText('cell 0-0, color White')).toHaveAttribute(
+      'data-text-color',
+      '#000000',
+    );
+    expect(screen.getByLabelText('cell 0-1, color Black')).toHaveAttribute(
+      'data-text-color',
+      '#ffffff',
+    );
+  });
 });
