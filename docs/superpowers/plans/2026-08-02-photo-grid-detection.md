@@ -853,12 +853,56 @@ describe('CornerStep', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Add a `PointerEvent` polyfill to `vitest.setup.ts`**
+
+jsdom (as of the version this project uses) has no native `PointerEvent` constructor, so Testing Library's `fireEvent.pointerDown`/`pointerMove`/`pointerUp` silently fall back to a bare `Event` and drop properties like `clientX`/`clientY` — which the drag test above needs. Add this to `vitest.setup.ts` (alongside the existing imports), guarded so it only applies if no real `PointerEvent` exists:
+
+```typescript
+// jsdom does not implement the PointerEvent constructor (as of jsdom 25), so
+// Testing Library's `fireEvent.pointer*` helpers silently fall back to a bare
+// `Event` and drop properties like clientX/clientY. Polyfill it as a thin
+// MouseEvent subclass so pointer-driven drag interactions are testable.
+if (typeof window !== 'undefined' && typeof window.PointerEvent === 'undefined') {
+  class PointerEventPolyfill extends MouseEvent {
+    public pointerId: number;
+    public width: number;
+    public height: number;
+    public pressure: number;
+    public tangentialPressure: number;
+    public tiltX: number;
+    public tiltY: number;
+    public twist: number;
+    public pointerType: string;
+    public isPrimary: boolean;
+
+    constructor(type: string, params: PointerEventInit = {}) {
+      super(type, params);
+      this.pointerId = params.pointerId ?? 0;
+      this.width = params.width ?? 1;
+      this.height = params.height ?? 1;
+      this.pressure = params.pressure ?? 0;
+      this.tangentialPressure = params.tangentialPressure ?? 0;
+      this.tiltX = params.tiltX ?? 0;
+      this.tiltY = params.tiltY ?? 0;
+      this.twist = params.twist ?? 0;
+      this.pointerType = params.pointerType ?? 'mouse';
+      this.isPrimary = params.isPrimary ?? false;
+    }
+  }
+
+  // @ts-expect-error - assigning a polyfill onto jsdom's window
+  window.PointerEvent = PointerEventPolyfill;
+}
+```
+
+This is added to a file shared by every test in the project, but is purely additive (guarded by the `typeof ... === 'undefined'` check) and has no effect on tests that don't use pointer events.
+
+- [ ] **Step 3: Run test to verify it fails**
 
 Run: `npx vitest run src/components/new-pattern/CornerStep.test.tsx`
 Expected: FAIL — module `./CornerStep` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [ ] **Step 4: Write the implementation**
 
 ```typescript
 import { useEffect, useRef, useState } from 'react';
@@ -947,7 +991,16 @@ export function CornerStep({
   useEffect(() => {
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
-    ctx.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
+    // TS 5.7+ made typed arrays generic over their backing buffer, and
+    // lib.dom's ImageData constructor only accepts the ArrayBuffer
+    // specialization — image.data's inferred ArrayBufferLike type doesn't
+    // structurally match even though it's a plain Uint8ClampedArray at
+    // runtime. Cast to the specialization the constructor expects.
+    ctx.putImageData(
+      new ImageData(image.data as Uint8ClampedArray<ArrayBuffer>, image.width, image.height),
+      0,
+      0,
+    );
   }, [image]);
 
   if (detecting || !corners) {
@@ -1030,15 +1083,20 @@ export function CornerStep({
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 5: Run test to verify it passes**
 
 Run: `npx vitest run src/components/new-pattern/CornerStep.test.tsx`
 Expected: PASS (5 tests).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Run the full test suite and type-check**
+
+Run: `npm test && npx tsc -b`
+Expected: all tests pass, no regressions from the `vitest.setup.ts` change (nothing else in the project uses pointer events yet, so it should be additive-only).
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/components/new-pattern/CornerStep.tsx src/components/new-pattern/CornerStep.test.tsx
+git add src/components/new-pattern/CornerStep.tsx src/components/new-pattern/CornerStep.test.tsx vitest.setup.ts
 git commit -m "feat: add CornerStep with draggable corner overlay for the photo path"
 ```
 
