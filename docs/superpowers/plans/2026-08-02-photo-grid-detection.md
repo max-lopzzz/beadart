@@ -967,6 +967,7 @@ export function CornerStep({
   const [colsInput, setColsInput] = useState(String(DEFAULT_COLS));
   const [processing, setProcessing] = useState(false);
   const [dragging, setDragging] = useState<CornerKey | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const rows = parsePositiveInt(rowsInput);
@@ -978,10 +979,23 @@ export function CornerStep({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const detected = await detectCorners(image);
-      if (cancelled) return;
-      setCorners(detected ?? defaultQuad(image.width, image.height));
-      setDetecting(false);
+      try {
+        const detected = await detectCorners(image);
+        if (cancelled) return;
+        setCorners(detected ?? defaultQuad(image.width, image.height));
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        // Detection failing (not just returning null) still falls back to
+        // the image's bounding box, exactly like the null case — the user
+        // can manually place corners either way. The error message is
+        // surfaced so they know detection itself failed, not just that it
+        // found nothing.
+        setCorners(defaultQuad(image.width, image.height));
+        setError(err instanceof Error ? err.message : 'Failed to detect the grid');
+      } finally {
+        if (!cancelled) setDetecting(false);
+      }
     })();
     return () => {
       cancelled = true;
@@ -1017,8 +1031,17 @@ export function CornerStep({
 
   const handleContinue = async () => {
     setProcessing(true);
-    const grid = await sampleGrid(image, corners, rows, cols);
-    onGridReady(grid);
+    try {
+      const grid = await sampleGrid(image, corners, rows, cols);
+      setError(null);
+      onGridReady(grid);
+    } catch (err) {
+      // Reset processing so the button is clickable again — e.g. after
+      // the user nudges the corners and retries — instead of leaving it
+      // stuck on "Processing…" forever.
+      setError(err instanceof Error ? err.message : 'Failed to process the grid');
+      setProcessing(false);
+    }
   };
 
   const cornerEntries = Object.entries(corners) as [CornerKey, Point][];
@@ -1026,6 +1049,7 @@ export function CornerStep({
   return (
     <div>
       <h2>Adjust the grid corners</h2>
+      {error && <p role="alert">{error}</p>}
       <div
         style={{ position: 'relative', width: displayWidth, height: displayHeight }}
         onPointerMove={handlePointerMove}
@@ -1086,7 +1110,7 @@ export function CornerStep({
 - [ ] **Step 5: Run test to verify it passes**
 
 Run: `npx vitest run src/components/new-pattern/CornerStep.test.tsx`
-Expected: PASS (5 tests).
+Expected: PASS (5 tests). (A later fix, made during this plan's final whole-branch review, adds try/catch around both `detectCorners` and `sampleGrid` — falling back to `defaultQuad` and surfacing a `<p role="alert">` on detection failure, and resetting `processing` back to `false` on a `sampleGrid` failure so the user can retry — plus 2 more tests for those paths, bringing the final count to 7. That error handling isn't in the code block above; it was added afterward because a real OpenCV failure with no error handling is indistinguishable from a silent hang.)
 
 - [ ] **Step 6: Run the full test suite and type-check**
 
