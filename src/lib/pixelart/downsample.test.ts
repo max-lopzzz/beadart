@@ -55,6 +55,36 @@ function makeDistinctBlockGrid(
   return { width, height, data };
 }
 
+function makeCheckerboardWithGridlines(
+  blockSize: number,
+  blocksPerSide: number,
+  borderColor: [number, number, number],
+): ImageBuffer {
+  const width = blockSize * blocksPerSide;
+  const height = width;
+  const data = new Uint8ClampedArray(width * height * 4);
+  const colorA: [number, number, number] = [255, 0, 0];
+  const colorB: [number, number, number] = [0, 0, 255];
+
+  for (let y = 0; y < height; y++) {
+    const blockY = Math.floor(y / blockSize);
+    const ly = y % blockSize;
+    for (let x = 0; x < width; x++) {
+      const blockX = Math.floor(x / blockSize);
+      const lx = x % blockSize;
+      const isBorder = lx === 0 || lx === blockSize - 1 || ly === 0 || ly === blockSize - 1;
+      const color = isBorder ? borderColor : (blockX + blockY) % 2 === 0 ? colorA : colorB;
+      const idx = (y * width + x) * 4;
+      data[idx] = color[0];
+      data[idx + 1] = color[1];
+      data[idx + 2] = color[2];
+      data[idx + 3] = 255;
+    }
+  }
+
+  return { width, height, data };
+}
+
 function makeSolidColor(
   width: number,
   height: number,
@@ -110,7 +140,27 @@ describe('downsampleToGrid', () => {
 });
 
 describe('downsampleToGridByCount', () => {
-  it('averages each cell to a single color, matching downsampleToGrid for an evenly-divisible case', () => {
+  it('samples the center pixel of each cell, ignoring gridline-colored borders around each source block', () => {
+    // Real pixel-art source images are often exported with a 1px gridline
+    // border drawn around each logical pixel block. Averaging the whole
+    // cell (as downsampleToGrid does) blends that border color into the
+    // result; sampling only the center pixel stays inside the fill color
+    // and never touches the border, regardless of the border's color.
+    const image = makeCheckerboardWithGridlines(5, 2, [0, 0, 0]);
+    const grid = downsampleToGridByCount(image, 2, 2);
+    expect(grid).toEqual([
+      [
+        { r: 255, g: 0, b: 0 },
+        { r: 0, g: 0, b: 255 },
+      ],
+      [
+        { r: 0, g: 0, b: 255 },
+        { r: 255, g: 0, b: 0 },
+      ],
+    ]);
+  });
+
+  it('samples the center pixel of each cell to a single color, matching downsampleToGrid for an evenly-divisible, border-free case', () => {
     const image = makeCheckerboard(3, 3, 2, 2);
     const grid = downsampleToGridByCount(image, 2, 2);
     expect(grid).toEqual([
@@ -125,19 +175,16 @@ describe('downsampleToGridByCount', () => {
     ]);
   });
 
-  it('produces exactly the requested cols x rows with no dropped or duplicated pixels for a non-evenly-divisible count', () => {
-    // A uniform-color source can't distinguish correct partitioning from
-    // broken partitioning (overlapping/skipped/duplicated pixels all still
-    // average to the same solid color), so this uses a 9x9 image built from
-    // a 3x3 grid of distinct-colored 3x3 blocks, downsampled to a 2x2 grid.
-    // 2 doesn't divide 9 evenly, so the cell boundaries (widths 4 and 5) cut
-    // across block boundaries: cell (0,0) spans x/y [0,4), which is 3 columns
-    // of block-col 0 plus 1 column of block-col 1 (and likewise for rows), so
-    // its expected average is a known weighted mix of 4 distinct blocks
-    // rather than a single block's color. A boundary-off-by-one bug (e.g.
-    // dropping or duplicating a row/column of source pixels at a cell edge)
-    // would shift these weights and change the computed average, so this
-    // test can actually fail on a partitioning regression.
+  it('produces exactly the requested cols x rows and picks the correct center pixel for a non-evenly-divisible count', () => {
+    // 9x9 image built from a 3x3 grid of distinct-colored 3x3 blocks,
+    // downsampled to a 2x2 grid. 2 doesn't divide 9 evenly, so the cell
+    // boundaries (widths 4 and 5) cut across block boundaries: cell (0,0)
+    // spans x/y [0,4) with center pixel at index 2, still inside block-col/
+    // row 0; cell (1,1) spans x/y [4,9) with center pixel at index 6, inside
+    // block-col/row 2. A boundary-off-by-one bug in the start/end/center
+    // computation would land on a different block and change the sampled
+    // color, so this test can still fail on a partitioning regression even
+    // though it no longer averages.
     const image = makeDistinctBlockGrid(3, 3);
     const grid = downsampleToGridByCount(image, 2, 2);
 
@@ -145,27 +192,27 @@ describe('downsampleToGridByCount', () => {
     expect(grid[0].length).toBe(2);
     expect(grid[1].length).toBe(2);
 
-    // Expected r averages, hand-computed from the block layout above:
-    // cell(0,0) = (9*0 + 3*10 + 3*30 + 1*40) / 16 = 10
-    // cell(0,1) = (6*10 + 9*20 + 2*40 + 3*50) / 20 = 23.5 -> rounds to 24
-    // cell(1,0) = (6*30 + 2*40 + 9*60 + 3*70) / 20 = 50.5 -> rounds to 51
-    // cell(1,1) = (4*40 + 6*50 + 6*70 + 9*80) / 25 = 64
+    // Expected r values: center pixel (x=2,y=2) falls in block (row 0, col
+    // 0) -> r=0; center (x=6,y=2) falls in block (row 0, col 2) -> r=20;
+    // center (x=2,y=6) falls in block (row 2, col 0) -> r=60; center (x=6,
+    // y=6) falls in block (row 2, col 2) -> r=80.
     expect(grid).toEqual([
       [
-        { r: 10, g: 0, b: 0 },
-        { r: 24, g: 0, b: 0 },
+        { r: 0, g: 0, b: 0 },
+        { r: 20, g: 0, b: 0 },
       ],
       [
-        { r: 51, g: 0, b: 0 },
-        { r: 64, g: 0, b: 0 },
+        { r: 60, g: 0, b: 0 },
+        { r: 80, g: 0, b: 0 },
       ],
     ]);
   });
 
-  it('does not produce NaN cells when the requested grid is larger than the source image', () => {
+  it('does not read out of bounds when the requested grid is larger than the source image', () => {
     // 2x2 image with a 3x3 requested grid: some columns/rows have startX === endX
-    // (or startY === endY) under the naive Math.floor boundaries, which previously
-    // caused count to stay 0 and sumR/count etc. to evaluate to NaN.
+    // (or startY === endY) under the naive Math.floor boundaries, which would give
+    // a zero-width cell with no valid center pixel to sample. Oversampled cells
+    // should fall back to duplicating the nearest source pixel instead.
     const image = makeSolidColor(2, 2, [50, 60, 70]);
     const grid = downsampleToGridByCount(image, 3, 3);
 
