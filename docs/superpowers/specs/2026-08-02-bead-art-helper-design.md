@@ -14,8 +14,7 @@ and check off colors as they're completed.
 ## Approach
 
 Fully client-side web app. No backend, no accounts. Everything — grid
-detection, perspective correction, color quantization, pattern storage —
-runs in the browser.
+detection, color quantization, pattern storage — runs in the browser.
 
 - **React + TypeScript + Vite** for the UI.
 - **Canvas API** for image manipulation (drawing, sampling, cropping,
