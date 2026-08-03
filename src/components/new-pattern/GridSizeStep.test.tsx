@@ -27,12 +27,12 @@ function makeCheckerboard(blockWidth: number, blockHeight: number, blocksX: numb
 }
 
 describe('GridSizeStep', () => {
-  it('pre-fills the detected block size and shows the resulting grid dimensions', () => {
+  it('pre-fills the detected pixel dimensions and shows the resulting grid size', () => {
     const image = makeCheckerboard(3, 3, 2, 2);
     render(<GridSizeStep image={image} onGridReady={vi.fn()} />);
 
-    expect(screen.getByLabelText(/block width/i)).toHaveValue(3);
-    expect(screen.getByLabelText(/block height/i)).toHaveValue(3);
+    expect(screen.getByLabelText(/how many pixels wide/i)).toHaveValue(2);
+    expect(screen.getByLabelText(/how many pixels tall/i)).toHaveValue(2);
     expect(screen.getByText(/2 × 2 pattern/i)).toBeInTheDocument();
   });
 
@@ -45,15 +45,15 @@ describe('GridSizeStep', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/could not auto-detect/i);
   });
 
-  it('recomputes the grid dimensions when the block size is changed', async () => {
+  it('recomputes the grid size when the pixel width is changed', async () => {
     const image = makeCheckerboard(3, 3, 2, 2);
     render(<GridSizeStep image={image} onGridReady={vi.fn()} />);
 
-    const widthInput = screen.getByLabelText(/block width/i);
+    const widthInput = screen.getByLabelText(/how many pixels wide/i);
     await userEvent.clear(widthInput);
-    await userEvent.type(widthInput, '2');
+    await userEvent.type(widthInput, '4');
 
-    expect(screen.getByText(/3 × 2 pattern/i)).toBeInTheDocument();
+    expect(screen.getByText(/4 × 2 pattern/i)).toBeInTheDocument();
   });
 
   it('calls onGridReady with the downsampled grid when Continue is clicked', async () => {
@@ -66,8 +66,14 @@ describe('GridSizeStep', () => {
     expect(onGridReady).toHaveBeenCalledTimes(1);
     const grid = onGridReady.mock.calls[0][0];
     expect(grid).toEqual([
-      [{ r: 255, g: 0, b: 0 }, { r: 0, g: 0, b: 255 }],
-      [{ r: 0, g: 0, b: 255 }, { r: 255, g: 0, b: 0 }],
+      [
+        { r: 255, g: 0, b: 0 },
+        { r: 0, g: 0, b: 255 },
+      ],
+      [
+        { r: 0, g: 0, b: 255 },
+        { r: 255, g: 0, b: 0 },
+      ],
     ]);
   });
 });
