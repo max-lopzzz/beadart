@@ -5,6 +5,8 @@ import { resetDbForTests } from '../../lib/storage/db';
 import { listPatterns } from '../../lib/storage/patternsRepo';
 import { NewPatternWizard } from './NewPatternWizard';
 import { ImageBuffer } from '../../lib/pixelart/blockDetect';
+import { Quad } from '../../lib/photo/quad';
+import { RGB } from '../../lib/color/lab';
 
 afterEach(async () => {
   resetDbForTests();
@@ -16,7 +18,6 @@ afterEach(async () => {
 });
 
 function makeCheckerboardImage(): ImageBuffer {
-  // 2x2 grid of 3x3-pixel red/blue blocks (6x6 total)
   const width = 6;
   const height = 6;
   const data = new Uint8ClampedArray(width * height * 4);
@@ -36,7 +37,7 @@ function makeCheckerboardImage(): ImageBuffer {
 }
 
 describe('NewPatternWizard', () => {
-  it('walks upload -> grid -> palette -> name -> save, persisting the pattern', async () => {
+  it('walks source-type -> digital -> upload -> grid -> palette -> name -> save, persisting the pattern', async () => {
     const image = makeCheckerboardImage();
     const loadImage = vi.fn().mockResolvedValue(image);
     const renderThumbnail = vi.fn().mockReturnValue('data:image/png;base64,thumb');
@@ -52,6 +53,8 @@ describe('NewPatternWizard', () => {
         createId={() => 'pattern-1'}
       />,
     );
+
+    await userEvent.click(screen.getByRole('button', { name: /digital pixel art image/i }));
 
     const file = new File(['fake'], 'pixel-art.png', { type: 'image/png' });
     await waitFor(() => screen.getByLabelText(/upload image/i));
@@ -78,6 +81,66 @@ describe('NewPatternWizard', () => {
       cols: 2,
       thumbnail: 'data:image/png;base64,thumb',
     });
-    expect(renderThumbnail).toHaveBeenCalled();
+  });
+
+  it('walks source-type -> photo -> upload -> corners -> palette -> name -> save, persisting the pattern', async () => {
+    const image: ImageBuffer = { width: 200, height: 200, data: new Uint8ClampedArray(200 * 200 * 4) };
+    const loadImage = vi.fn().mockResolvedValue(image);
+    const sampleQuad: Quad = {
+      topLeft: { x: 0, y: 0 },
+      topRight: { x: 200, y: 0 },
+      bottomRight: { x: 200, y: 200 },
+      bottomLeft: { x: 0, y: 200 },
+    };
+    const detectCorners = vi.fn().mockResolvedValue(sampleQuad);
+    const resultGrid: RGB[][] = [
+      [
+        { r: 255, g: 0, b: 0 },
+        { r: 0, g: 0, b: 255 },
+      ],
+      [
+        { r: 0, g: 255, b: 0 },
+        { r: 255, g: 255, b: 0 },
+      ],
+    ];
+    const sampleGrid = vi.fn().mockResolvedValue(resultGrid);
+    const renderThumbnail = vi.fn().mockReturnValue('data:image/png;base64,thumb');
+    const onDone = vi.fn();
+
+    render(
+      <NewPatternWizard
+        onDone={onDone}
+        onCancel={vi.fn()}
+        loadImage={loadImage}
+        detectCorners={detectCorners}
+        sampleGrid={sampleGrid}
+        renderThumbnail={renderThumbnail}
+        now={() => '2026-08-02T00:00:00.000Z'}
+        createId={() => 'pattern-1'}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /photo of a drawing/i }));
+
+    const file = new File(['fake'], 'photo.jpg', { type: 'image/jpeg' });
+    await waitFor(() => screen.getByLabelText(/upload image/i));
+    await userEvent.upload(screen.getByLabelText(/upload image/i), file);
+
+    await waitFor(() => screen.getByLabelText('topLeft handle'));
+    await userEvent.click(screen.getByRole('button', { name: /continue/i }));
+
+    await waitFor(() => screen.getByRole('button', { name: /save pattern/i }));
+    await userEvent.click(screen.getByRole('button', { name: /save pattern/i }));
+
+    await waitFor(() => screen.getByLabelText(/pattern name/i));
+    await userEvent.type(screen.getByLabelText(/pattern name/i), 'Photo Pattern');
+    await userEvent.click(screen.getByRole('button', { name: /save pattern/i }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith('pattern-1'));
+
+    expect(sampleGrid).toHaveBeenCalledWith(image, sampleQuad, 10, 10);
+    const saved = await listPatterns();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].name).toBe('Photo Pattern');
   });
 });
