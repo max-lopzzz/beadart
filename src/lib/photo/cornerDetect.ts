@@ -3,14 +3,13 @@ import { Point, Quad } from './quad';
 import { loadOpenCv } from './opencv';
 
 function orderQuadPoints(points: Point[]): Quad {
-  const byY = [...points].sort((a, b) => a.y - b.y);
-  const top = byY.slice(0, 2).sort((a, b) => a.x - b.x);
-  const bottom = byY.slice(2, 4).sort((a, b) => a.x - b.x);
+  const bySum = [...points].sort((a, b) => a.x + a.y - (b.x + b.y));
+  const byDiff = [...points].sort((a, b) => a.y - a.x - (b.y - b.x));
   return {
-    topLeft: top[0],
-    topRight: top[1],
-    bottomLeft: bottom[0],
-    bottomRight: bottom[1],
+    topLeft: bySum[0],
+    bottomRight: bySum[3],
+    topRight: byDiff[0],
+    bottomLeft: byDiff[3],
   };
 }
 
