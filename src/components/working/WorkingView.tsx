@@ -3,6 +3,8 @@ import { usePatterns } from '../../hooks/usePatterns';
 import { usePalettes } from '../../hooks/usePalettes';
 import { colorCounts, completionPercent } from '../../lib/pattern/patternStats';
 import { renderPatternToDataUrl } from '../../lib/image/renderPattern';
+import { findSimilarColors } from '../../lib/color/nearestMatch';
+import { contrastTextColor } from '../../lib/color/contrast';
 import { ProgressBar } from '../shared/Progress';
 
 interface WorkingViewProps {
@@ -16,10 +18,11 @@ export function WorkingView({
   onBack,
   renderExport = renderPatternToDataUrl,
 }: WorkingViewProps) {
-  const { patterns, loading: patternsLoading, toggleColorCompleted } = usePatterns();
+  const { patterns, loading: patternsLoading, toggleColorCompleted, replaceColor } = usePatterns();
   const { palettes, loading: palettesLoading } = usePalettes();
   const [activeColors, setActiveColors] = useState<Set<string>>(new Set());
   const [exportUrl, setExportUrl] = useState<string | null>(null);
+  const [replacingColor, setReplacingColor] = useState<string | null>(null);
 
   if (patternsLoading || palettesLoading) {
     return <div>Loading...</div>;
@@ -46,6 +49,12 @@ export function WorkingView({
       }
       return next;
     });
+  };
+
+  const handleReplace = async (newColorName: string) => {
+    if (!replacingColor) return;
+    await replaceColor(pattern.id, replacingColor, newColorName);
+    setReplacingColor(null);
   };
 
   const handleExport = () => {
@@ -112,27 +121,60 @@ export function WorkingView({
           <ul className="legend-list">
             {counts.map((color) => {
               const isActive = activeColors.has(color.name);
+              const isReplacing = replacingColor === color.name;
               return (
-                <li key={color.name} className="legend-row">
-                  <input
-                    type="checkbox"
-                    aria-label={`mark ${color.name} complete`}
-                    checked={pattern.completedColors.includes(color.name)}
-                    onChange={(e) => toggleColorCompleted(pattern.id, color.name, e.target.checked)}
-                  />
-                  <button
-                    className="legend-swatch-btn"
-                    data-active={isActive ? 'true' : 'false'}
-                    onClick={() => toggleActiveColor(color.name)}
-                  >
-                    <span
-                      className="bead bead-sm"
-                      aria-hidden="true"
-                      data-hex={color.hex}
-                      style={{ backgroundColor: color.hex }}
+                <li key={color.name} className="legend-row-group">
+                  <div className="legend-row">
+                    <input
+                      type="checkbox"
+                      aria-label={`mark ${color.name} complete`}
+                      checked={pattern.completedColors.includes(color.name)}
+                      onChange={(e) =>
+                        toggleColorCompleted(pattern.id, color.name, e.target.checked)
+                      }
                     />
-                    {color.name} × {color.count}
-                  </button>
+                    <button
+                      className="legend-swatch-btn"
+                      data-active={isActive ? 'true' : 'false'}
+                      onClick={() => toggleActiveColor(color.name)}
+                    >
+                      <span
+                        className="bead bead-sm"
+                        aria-hidden="true"
+                        data-hex={color.hex}
+                        style={{ backgroundColor: color.hex }}
+                      />
+                      {color.name} × {color.count}
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      aria-label={`Replace ${color.name}`}
+                      onClick={() => setReplacingColor(isReplacing ? null : color.name)}
+                    >
+                      Replace
+                    </button>
+                  </div>
+                  {isReplacing && (
+                    <div className="swatch-picker" role="group" aria-label="Choose a similar color">
+                      {findSimilarColors(
+                        { name: color.name, hex: color.hex },
+                        palette.colors,
+                      ).map((option) => (
+                        <button
+                          key={option.name}
+                          className="bead-btn"
+                          aria-label={`Replace with ${option.name}`}
+                          style={{
+                            backgroundColor: option.hex,
+                            color: contrastTextColor(option.hex),
+                          }}
+                          onClick={() => handleReplace(option.name)}
+                        >
+                          {option.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </li>
               );
             })}

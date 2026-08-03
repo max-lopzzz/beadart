@@ -113,6 +113,33 @@ describe('WorkingView', () => {
     expect(blueSwatch).toHaveAttribute('data-hex', '#0000ff');
   });
 
+  it('shows similar palette colors to replace with when Replace is clicked', async () => {
+    await savePalette(palette);
+    await savePattern(pattern);
+    render(<WorkingView patternId="pattern-1" onBack={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('Red × 1'));
+    await userEvent.click(screen.getByRole('button', { name: /replace red/i }));
+
+    expect(screen.getByRole('button', { name: /replace with blue/i })).toBeInTheDocument();
+  });
+
+  it('replaces a color throughout the pattern when a similar option is chosen', async () => {
+    await savePalette(palette);
+    await savePattern(pattern);
+    render(<WorkingView patternId="pattern-1" onBack={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('Red × 1'));
+    await userEvent.click(screen.getByRole('button', { name: /replace red/i }));
+    await userEvent.click(screen.getByRole('button', { name: /replace with blue/i }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('cell 0-0, color Blue')).toBeInTheDocument(),
+    );
+    expect(screen.getByText('Blue × 2')).toBeInTheDocument();
+    expect(screen.queryByText(/^Red ×/)).not.toBeInTheDocument();
+  });
+
   it('calls renderExport with the active color filter when Export is clicked', async () => {
     await savePalette(palette);
     await savePattern(pattern);

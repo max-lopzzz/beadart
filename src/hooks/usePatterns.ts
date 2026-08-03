@@ -3,6 +3,7 @@ import { Pattern } from '../types/pattern';
 import {
   deletePattern,
   listPatterns,
+  replaceColorInPattern,
   savePattern,
   setColorCompleted,
 } from '../lib/storage/patternsRepo';
@@ -46,5 +47,13 @@ export function usePatterns() {
     [refresh],
   );
 
-  return { patterns, loading, addPattern, removePattern, toggleColorCompleted };
+  const replaceColor = useCallback(
+    async (patternId: string, fromColor: string, toColor: string) => {
+      await replaceColorInPattern(patternId, fromColor, toColor);
+      await refresh();
+    },
+    [refresh],
+  );
+
+  return { patterns, loading, addPattern, removePattern, toggleColorCompleted, replaceColor };
 }

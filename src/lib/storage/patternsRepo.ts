@@ -43,3 +43,24 @@ export async function setColorCompleted(
   await db.put('patterns', updated);
   return updated;
 }
+
+export async function replaceColorInPattern(
+  patternId: string,
+  fromColor: string,
+  toColor: string,
+): Promise<Pattern> {
+  const db = await getDb();
+  const pattern = await db.get('patterns', patternId);
+  if (!pattern) {
+    throw new Error(`Pattern "${patternId}" not found`);
+  }
+
+  const cellColors = pattern.cellColors.map((row) =>
+    row.map((colorName) => (colorName === fromColor ? toColor : colorName)),
+  );
+  const completedColors = pattern.completedColors.filter((name) => name !== fromColor);
+
+  const updated: Pattern = { ...pattern, cellColors, completedColors };
+  await db.put('patterns', updated);
+  return updated;
+}

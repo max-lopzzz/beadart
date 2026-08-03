@@ -20,6 +20,48 @@ describe('HomeScreen', () => {
   it('shows an empty state when there are no patterns', async () => {
     render(<HomeScreen onOpenPattern={vi.fn()} onNewPattern={vi.fn()} onManagePalettes={vi.fn()} />);
     await waitFor(() => expect(screen.getByText(/no patterns yet/i)).toBeInTheDocument());
+    expect(screen.queryByText(/materials overview/i)).not.toBeInTheDocument();
+  });
+
+  it('shows a materials overview totaling color usage across all patterns', async () => {
+    await savePalette(defaultPalette);
+    const colorA = defaultPalette.colors[0].name;
+    const colorB = defaultPalette.colors[1].name;
+    await savePattern({
+      id: 'pattern-1',
+      name: 'Pattern One',
+      createdAt: '2026-08-02T00:00:00.000Z',
+      rows: 2,
+      cols: 2,
+      cellColors: [
+        [colorA, colorA],
+        [colorB, colorA],
+      ],
+      paletteId: defaultPalette.id,
+      completedColors: [],
+      thumbnail: '',
+    });
+    await savePattern({
+      id: 'pattern-2',
+      name: 'Pattern Two',
+      createdAt: '2026-08-02T00:00:00.000Z',
+      rows: 1,
+      cols: 1,
+      cellColors: [[colorA]],
+      paletteId: defaultPalette.id,
+      completedColors: [colorA],
+      thumbnail: '',
+    });
+
+    render(<HomeScreen onOpenPattern={vi.fn()} onNewPattern={vi.fn()} onManagePalettes={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText(/materials overview/i)).toBeInTheDocument());
+
+    // colorA: 3 (incomplete) from Pattern One + 1 (complete) from Pattern Two = 4 total, 3 left
+    expect(screen.getByText(`${colorA} × 4`)).toBeInTheDocument();
+    expect(screen.getByText('3 left')).toBeInTheDocument();
+
+    // colorB: 1 total, 1 left
+    expect(screen.getByText(`${colorB} × 1`)).toBeInTheDocument();
   });
 
   it('lists saved patterns with their completion percent', async () => {

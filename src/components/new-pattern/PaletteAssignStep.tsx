@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { RGB } from '../../lib/color/lab';
+import { contrastTextColor } from '../../lib/color/contrast';
 import { Palette } from '../../types/palette';
 import { buildCellColors } from '../../lib/pattern/buildPattern';
 
@@ -15,21 +16,6 @@ interface SelectedCell {
 }
 
 const CELL_SIZE_PX = 28;
-
-function hexToRgbChannels(hex: string): [number, number, number] {
-  const clean = hex.replace('#', '');
-  return [
-    parseInt(clean.substring(0, 2), 16),
-    parseInt(clean.substring(2, 4), 16),
-    parseInt(clean.substring(4, 6), 16),
-  ];
-}
-
-function contrastTextColor(hex: string): string {
-  const [r, g, b] = hexToRgbChannels(hex);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance >= 0.5 ? '#000000' : '#ffffff';
-}
 
 export function PaletteAssignStep({ grid, palette, onConfirm }: PaletteAssignStepProps) {
   const [cellColors, setCellColors] = useState<string[][]>(() =>

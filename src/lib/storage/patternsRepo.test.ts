@@ -6,6 +6,7 @@ import {
   listPatterns,
   deletePattern,
   setColorCompleted,
+  replaceColorInPattern,
 } from './patternsRepo';
 import { Pattern } from '../../types/pattern';
 
@@ -66,5 +67,24 @@ describe('patternsRepo', () => {
 
   it('throws when marking a color complete on a missing pattern', async () => {
     await expect(setColorCompleted('missing', 'A1', true)).rejects.toThrow('not found');
+  });
+
+  it('replaces every occurrence of a color throughout the pattern', async () => {
+    await savePattern(makePattern({ cellColors: [['A1', 'A2'], ['A1', 'A1']] }));
+    const updated = await replaceColorInPattern('pattern-1', 'A1', 'B1');
+    expect(updated.cellColors).toEqual([
+      ['B1', 'A2'],
+      ['B1', 'B1'],
+    ]);
+  });
+
+  it('drops the replaced color from completedColors, keeping the target color as-is', async () => {
+    await savePattern(makePattern({ completedColors: ['A1', 'A3'] }));
+    const updated = await replaceColorInPattern('pattern-1', 'A1', 'A2');
+    expect(updated.completedColors.sort()).toEqual(['A3']);
+  });
+
+  it('throws when replacing a color on a missing pattern', async () => {
+    await expect(replaceColorInPattern('missing', 'A1', 'B1')).rejects.toThrow('not found');
   });
 });

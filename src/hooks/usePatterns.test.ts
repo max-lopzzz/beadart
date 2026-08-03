@@ -63,4 +63,16 @@ describe('usePatterns', () => {
     });
     expect(result.current.patterns[0].completedColors).toEqual(['A1']);
   });
+
+  it('replaceColor updates cellColors on the pattern in state', async () => {
+    const { result } = renderHook(() => usePatterns());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.addPattern(makePattern());
+    });
+    await act(async () => {
+      await result.current.replaceColor('pattern-1', 'A1', 'B1');
+    });
+    expect(result.current.patterns[0].cellColors).toEqual([['B1']]);
+  });
 });

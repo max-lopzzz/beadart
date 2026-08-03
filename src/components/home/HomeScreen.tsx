@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { usePatterns } from '../../hooks/usePatterns';
 import { usePalettes } from '../../hooks/usePalettes';
 import { completionPercent } from '../../lib/pattern/patternStats';
+import { aggregateColorTotals } from '../../lib/pattern/materialsSummary';
 import { ProgressRing } from '../shared/Progress';
 
 interface HomeScreenProps {
@@ -35,6 +36,9 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
   if (patternsLoading || palettesLoading) {
     return <div>Loading...</div>;
   }
+
+  const palettesById = new Map(palettes.map((p) => [p.id, p]));
+  const materials = aggregateColorTotals(patterns, palettesById);
 
   return (
     <div className="container">
@@ -127,6 +131,27 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
               </div>
             );
           })}
+        </div>
+      )}
+      {materials.length > 0 && (
+        <div className="materials-section">
+          <h3>Materials overview</h3>
+          <p className="hint">How many of each color you still need, across all patterns.</p>
+          <ul className="materials-list">
+            {materials.map((color) => (
+              <li key={color.name} className="materials-row">
+                <span className="bead bead-md" style={{ backgroundColor: color.hex }} />
+                <span className="materials-row-name">
+                  {color.name} × {color.total}
+                </span>
+                {color.incomplete > 0 ? (
+                  <span className="materials-row-remaining">{color.incomplete} left</span>
+                ) : (
+                  <span className="materials-row-done">all placed</span>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

@@ -16,6 +16,21 @@ export function hexToRgb(hex: string): RGB {
   };
 }
 
+export function findSimilarColors(
+  target: PaletteColor,
+  palette: PaletteColor[],
+  limit = 8,
+): PaletteColor[] {
+  const targetLab = rgbToLab(hexToRgb(target.hex));
+
+  return palette
+    .filter((c) => c.name !== target.name)
+    .map((c) => ({ color: c, distance: deltaE76(targetLab, rgbToLab(hexToRgb(c.hex))) }))
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, limit)
+    .map((entry) => entry.color);
+}
+
 export function findNearestColor(rgb: RGB, palette: PaletteColor[]): PaletteColor {
   if (palette.length === 0) {
     throw new Error('findNearestColor: palette must not be empty');
