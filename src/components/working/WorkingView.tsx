@@ -3,6 +3,7 @@ import { usePatterns } from '../../hooks/usePatterns';
 import { usePalettes } from '../../hooks/usePalettes';
 import { colorCounts, completionPercent } from '../../lib/pattern/patternStats';
 import { renderPatternToDataUrl } from '../../lib/image/renderPattern';
+import { ProgressBar } from '../shared/Progress';
 
 interface WorkingViewProps {
   patternId: string;
@@ -40,66 +41,90 @@ export function WorkingView({
   };
 
   return (
-    <div>
-      <button onClick={onBack}>Back</button>
-      <h2>{pattern.name}</h2>
-      <p>{percent}% complete</p>
-      <table>
-        <tbody>
-          {pattern.cellColors.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {row.map((colorName, colIndex) => {
-                const dimmed = activeColor !== null && colorName !== activeColor;
-                return (
-                  <td key={colIndex}>
-                    <div
-                      aria-label={`cell ${rowIndex}-${colIndex}, color ${colorName}`}
-                      data-dimmed={dimmed ? 'true' : 'false'}
-                      style={{
-                        width: 20,
-                        height: 20,
-                        backgroundColor: dimmed ? '#e0e0e0' : hexByName.get(colorName),
-                      }}
+    <div className="container">
+      <div className="working-header">
+        <button className="btn btn-ghost btn-sm" onClick={onBack}>
+          ← Back
+        </button>
+        <div className="working-title">
+          <h2>{pattern.name}</h2>
+        </div>
+        <div className="working-progress">
+          <ProgressBar percent={percent} />
+          <span className="working-progress-label">{percent}% complete</span>
+        </div>
+      </div>
+      <div className="working-layout">
+        <div className="pixel-grid-wrap surface" style={{ padding: 'var(--space-3)' }}>
+          <table>
+            <tbody>
+              {pattern.cellColors.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {row.map((colorName, colIndex) => {
+                    const dimmed = activeColor !== null && colorName !== activeColor;
+                    return (
+                      <td key={colIndex}>
+                        <div
+                          className="pixel-cell"
+                          aria-label={`cell ${rowIndex}-${colIndex}, color ${colorName}`}
+                          data-dimmed={dimmed ? 'true' : 'false'}
+                          style={{
+                            width: 22,
+                            height: 22,
+                            backgroundColor: dimmed ? 'var(--border)' : hexByName.get(colorName),
+                          }}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="surface" style={{ padding: 'var(--space-3)' }}>
+          <ul className="legend-list">
+            {counts.map((color) => {
+              const isActive = activeColor === color.name;
+              return (
+                <li key={color.name} className="legend-row">
+                  <input
+                    type="checkbox"
+                    aria-label={`mark ${color.name} complete`}
+                    checked={pattern.completedColors.includes(color.name)}
+                    onChange={(e) => toggleColorCompleted(pattern.id, color.name, e.target.checked)}
+                  />
+                  <button
+                    className="legend-swatch-btn"
+                    data-active={isActive ? 'true' : 'false'}
+                    onClick={() =>
+                      setActiveColor((prev) => (prev === color.name ? null : color.name))
+                    }
+                  >
+                    <span
+                      className="bead bead-sm"
+                      aria-hidden="true"
+                      data-hex={color.hex}
+                      style={{ backgroundColor: color.hex }}
                     />
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <ul>
-        {counts.map((color) => (
-          <li key={color.name}>
-            <input
-              type="checkbox"
-              aria-label={`mark ${color.name} complete`}
-              checked={pattern.completedColors.includes(color.name)}
-              onChange={(e) => toggleColorCompleted(pattern.id, color.name, e.target.checked)}
-            />
-            <button onClick={() => setActiveColor((prev) => (prev === color.name ? null : color.name))}>
-              <span
-                aria-hidden="true"
-                data-hex={color.hex}
-                style={{
-                  display: 'inline-block',
-                  width: 12,
-                  height: 12,
-                  marginRight: 4,
-                  backgroundColor: color.hex,
-                }}
-              />
-              {color.name} × {color.count}
+                    {color.name} × {color.count}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="export-row">
+            <button className="btn btn-secondary btn-sm" onClick={handleExport}>
+              Export image
             </button>
-          </li>
-        ))}
-      </ul>
-      <button onClick={handleExport}>Export image</button>
-      {exportUrl && (
-        <a href={exportUrl} download={`${pattern.name}.png`}>
-          Download image
-        </a>
-      )}
+            {exportUrl && (
+              <a href={exportUrl} download={`${pattern.name}.png`}>
+                Download image
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

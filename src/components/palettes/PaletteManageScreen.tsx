@@ -53,40 +53,60 @@ export function PaletteManageScreen({
   };
 
   return (
-    <div>
-      <button onClick={onBack}>Back</button>
+    <div className="container-narrow">
+      <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: 'var(--space-4)' }}>
+        ← Back
+      </button>
       <h2>Manage Palettes</h2>
-      <ul>
+      <ul className="palette-list">
         {palettes.map((palette) => (
-          <li key={palette.id}>
+          <li key={palette.id} className="surface palette-row">
             {renamingId === palette.id ? (
-              <>
-                <label htmlFor={`rename-${palette.id}`}>Rename {palette.name}</label>
-                <input
-                  id={`rename-${palette.id}`}
-                  value={renameValue}
-                  onChange={(e) => setRenameValue(e.target.value)}
-                />
-                <button onClick={() => confirmRename(palette)}>Save name</button>
-              </>
+              <div className="rename-row">
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor={`rename-${palette.id}`}>Rename {palette.name}</label>
+                  <input
+                    id={`rename-${palette.id}`}
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={() => confirmRename(palette)}>
+                  Save name
+                </button>
+              </div>
             ) : (
               <>
-                <span>
-                  {palette.name} ({palette.colors.length} colors)
-                </span>
-                {!palette.isBuiltIn && (
-                  <button
-                    onClick={() => {
-                      setRenamingId(palette.id);
-                      setRenameValue(palette.name);
-                    }}
-                  >
-                    Rename
-                  </button>
-                )}
-                {!palette.isBuiltIn && (
-                  <button onClick={() => handleDelete(palette.id)}>Delete</button>
-                )}
+                <div className="palette-swatch-strip" aria-hidden="true">
+                  {palette.colors.slice(0, 5).map((color, i) => (
+                    <span
+                      key={i}
+                      className="bead bead-md"
+                      style={{ backgroundColor: color.hex }}
+                    />
+                  ))}
+                </div>
+                <span className="palette-row-name">{palette.name}</span>
+                <span className="palette-row-count">{palette.colors.length} colors</span>
+                <div className="palette-row-actions">
+                  {!palette.isBuiltIn && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setRenamingId(palette.id);
+                        setRenameValue(palette.name);
+                      }}
+                    >
+                      Rename
+                    </button>
+                  )}
+                  {!palette.isBuiltIn && (
+                    <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(palette.id)}>
+                      Delete
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </li>
@@ -94,19 +114,36 @@ export function PaletteManageScreen({
       </ul>
       {deleteError && <p role="alert">{deleteError}</p>}
 
-      <h3>Import a palette</h3>
-      <label htmlFor="palette-name-input">Palette name</label>
-      <input id="palette-name-input" value={csvName} onChange={(e) => setCsvName(e.target.value)} />
-      <label htmlFor="palette-csv-input">Palette CSV (Name,Color)</label>
-      <textarea id="palette-csv-input" value={csvText} onChange={(e) => setCsvText(e.target.value)} />
-      <button onClick={handleImport}>Import</button>
-      {importErrors.length > 0 && (
-        <ul role="alert">
-          {importErrors.map((error, i) => (
-            <li key={i}>{error}</li>
-          ))}
-        </ul>
-      )}
+      <div className="surface" style={{ padding: 'var(--space-5)' }}>
+        <h3>Import a palette</h3>
+        <div className="field">
+          <label htmlFor="palette-name-input">Palette name</label>
+          <input
+            id="palette-name-input"
+            value={csvName}
+            onChange={(e) => setCsvName(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="palette-csv-input">Palette CSV (Name,Color)</label>
+          <textarea
+            id="palette-csv-input"
+            value={csvText}
+            onChange={(e) => setCsvText(e.target.value)}
+            placeholder={'Name,Color\nA1,#fff4e6'}
+          />
+        </div>
+        <button className="btn btn-primary" onClick={handleImport}>
+          Import
+        </button>
+        {importErrors.length > 0 && (
+          <ul role="alert">
+            {importErrors.map((error, i) => (
+              <li key={i}>{error}</li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

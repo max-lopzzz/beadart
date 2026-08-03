@@ -35,31 +35,41 @@ export function GridSizeStep({ image, onGridReady }: GridSizeStepProps) {
   };
 
   return (
-    <div>
+    <div className="container-narrow" style={{ padding: 0 }}>
       <h2>Confirm pixel art size</h2>
       {!detected && (
         <p role="alert">Could not auto-detect a grid — please enter the size manually.</p>
       )}
-      <label htmlFor="pixel-width-input">How many pixels wide is your pixel art?</label>
-      <input
-        id="pixel-width-input"
-        type="number"
-        min={1}
-        value={colsInput}
-        onChange={(e) => setColsInput(e.target.value)}
-      />
-      <label htmlFor="pixel-height-input">How many pixels tall is your pixel art?</label>
-      <input
-        id="pixel-height-input"
-        type="number"
-        min={1}
-        value={rowsInput}
-        onChange={(e) => setRowsInput(e.target.value)}
-      />
-      <p>
+      <div className="field-row">
+        <div className="field">
+          <label htmlFor="pixel-width-input">How many pixels wide is your pixel art?</label>
+          <input
+            id="pixel-width-input"
+            type="number"
+            min={1}
+            value={colsInput}
+            onChange={(e) => setColsInput(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="pixel-height-input">How many pixels tall is your pixel art?</label>
+          <input
+            id="pixel-height-input"
+            type="number"
+            min={1}
+            value={rowsInput}
+            onChange={(e) => setRowsInput(e.target.value)}
+          />
+        </div>
+      </div>
+      <p className="hint mono">
         This will create a {cols} × {rows} pattern.
       </p>
-      <button onClick={handleContinue}>Continue</button>
+      <div style={{ marginTop: 'var(--space-5)' }}>
+        <button className="btn btn-primary" onClick={handleContinue}>
+          Continue
+        </button>
+      </div>
     </div>
   );
 }

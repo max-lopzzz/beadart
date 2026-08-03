@@ -52,45 +52,52 @@ export function PaletteAssignStep({ grid, palette, onConfirm }: PaletteAssignSte
   return (
     <div>
       <h2>Review pattern colors</h2>
-      <table>
-        <tbody>
-          {cellColors.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {row.map((colorName, colIndex) => {
-                const hex = hexByName.get(colorName) ?? '#000000';
-                const textColor = contrastTextColor(hex);
-                return (
-                  <td key={colIndex}>
-                    <button
-                      aria-label={`cell ${rowIndex}-${colIndex}, color ${colorName}`}
-                      data-text-color={textColor}
-                      onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
-                      style={{
-                        width: CELL_SIZE_PX,
-                        height: CELL_SIZE_PX,
-                        padding: 0,
-                        border: '1px solid #999',
-                        backgroundColor: hex,
-                        color: textColor,
-                        fontSize: 9,
-                      }}
-                    >
-                      {colorName}
-                    </button>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <p className="hint">Click any cell to swap its color, then confirm below.</p>
+      <div className="assign-grid-wrap surface" style={{ padding: 'var(--space-3)' }}>
+        <table>
+          <tbody>
+            {cellColors.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((colorName, colIndex) => {
+                  const hex = hexByName.get(colorName) ?? '#000000';
+                  const textColor = contrastTextColor(hex);
+                  const isSelected =
+                    selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
+                  return (
+                    <td key={colIndex}>
+                      <button
+                        className="assign-cell"
+                        aria-label={`cell ${rowIndex}-${colIndex}, color ${colorName}`}
+                        data-text-color={textColor}
+                        data-selected={isSelected ? 'true' : 'false'}
+                        onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
+                        style={{
+                          width: CELL_SIZE_PX,
+                          height: CELL_SIZE_PX,
+                          padding: 0,
+                          backgroundColor: hex,
+                          color: textColor,
+                          fontSize: 9,
+                        }}
+                      >
+                        {colorName}
+                      </button>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {selectedCell && (
-        <div role="group" aria-label="Choose a replacement color">
+        <div className="swatch-picker" role="group" aria-label="Choose a replacement color">
           {palette.colors.map((color) => (
             <button
               key={color.name}
+              className="bead-btn"
               aria-label={`swatch ${color.name}`}
-              style={{ backgroundColor: color.hex }}
+              style={{ backgroundColor: color.hex, color: contrastTextColor(color.hex) }}
               onClick={() => handleSwatchClick(color.name)}
             >
               {color.name}
@@ -98,7 +105,9 @@ export function PaletteAssignStep({ grid, palette, onConfirm }: PaletteAssignSte
           ))}
         </div>
       )}
-      <button onClick={() => onConfirm(cellColors)}>Save Pattern</button>
+      <button className="btn btn-primary" onClick={() => onConfirm(cellColors)}>
+        Save Pattern
+      </button>
     </div>
   );
 }

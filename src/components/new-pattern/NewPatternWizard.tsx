@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { ImageBuffer } from '../../lib/pixelart/blockDetect';
 import { RGB } from '../../lib/color/lab';
 import { Pattern } from '../../types/pattern';
@@ -8,12 +8,21 @@ import { renderPatternToDataUrl } from '../../lib/image/renderPattern';
 import { UploadStep } from './UploadStep';
 import { GridSizeStep } from './GridSizeStep';
 import { PaletteAssignStep } from './PaletteAssignStep';
+import { StepIndicator } from '../shared/StepIndicator';
 
 type WizardStep =
   | { name: 'upload' }
   | { name: 'grid'; image: ImageBuffer }
   | { name: 'palette'; grid: RGB[][] }
   | { name: 'name'; cellColors: string[][] };
+
+const STEP_LABELS = ['Upload', 'Grid size', 'Palette', 'Name'];
+const STEP_INDEX: Record<WizardStep['name'], number> = {
+  upload: 0,
+  grid: 1,
+  palette: 2,
+  name: 3,
+};
 
 interface NewPatternWizardProps {
   onDone: (patternId: string) => void;
@@ -37,21 +46,27 @@ export function NewPatternWizard({
   const [step, setStep] = useState<WizardStep>({ name: 'upload' });
   const [patternName, setPatternName] = useState('');
 
-  if (step.name === 'upload') {
-    return (
-      <div>
-        <UploadStep loadImage={loadImage} onImageLoaded={(image) => setStep({ name: 'grid', image })} />
-        <button onClick={onCancel}>Cancel</button>
+  const shell = (children: ReactNode) => (
+    <div className="container wizard-shell">
+      <div className="wizard-header">
+        <StepIndicator steps={STEP_LABELS} currentIndex={STEP_INDEX[step.name]} />
+        <button className="btn btn-ghost btn-sm" onClick={onCancel}>
+          Cancel
+        </button>
       </div>
+      {children}
+    </div>
+  );
+
+  if (step.name === 'upload') {
+    return shell(
+      <UploadStep loadImage={loadImage} onImageLoaded={(image) => setStep({ name: 'grid', image })} />,
     );
   }
 
   if (step.name === 'grid') {
-    return (
-      <div>
-        <GridSizeStep image={step.image} onGridReady={(grid) => setStep({ name: 'palette', grid })} />
-        <button onClick={onCancel}>Cancel</button>
-      </div>
+    return shell(
+      <GridSizeStep image={step.image} onGridReady={(grid) => setStep({ name: 'palette', grid })} />,
     );
   }
 
@@ -65,15 +80,12 @@ export function NewPatternWizard({
     if (!palette) {
       return <p>No palette available.</p>;
     }
-    return (
-      <div>
-        <PaletteAssignStep
-          grid={step.grid}
-          palette={palette}
-          onConfirm={(cellColors) => setStep({ name: 'name', cellColors })}
-        />
-        <button onClick={onCancel}>Cancel</button>
-      </div>
+    return shell(
+      <PaletteAssignStep
+        grid={step.grid}
+        palette={palette}
+        onConfirm={(cellColors) => setStep({ name: 'name', cellColors })}
+      />,
     );
   }
 
@@ -97,17 +109,22 @@ export function NewPatternWizard({
     onDone(pattern.id);
   };
 
-  return (
-    <div>
+  return shell(
+    <div className="container-narrow" style={{ padding: 0 }}>
       <h2>Name your pattern</h2>
-      <label htmlFor="pattern-name-input">Pattern name</label>
-      <input
-        id="pattern-name-input"
-        value={patternName}
-        onChange={(e) => setPatternName(e.target.value)}
-      />
-      <button onClick={handleSave}>Save Pattern</button>
-      <button onClick={onCancel}>Cancel</button>
-    </div>
+      <div className="field">
+        <label htmlFor="pattern-name-input">Pattern name</label>
+        <input
+          id="pattern-name-input"
+          value={patternName}
+          onChange={(e) => setPatternName(e.target.value)}
+          placeholder="e.g. Pixel Fox"
+          autoFocus
+        />
+      </div>
+      <button className="btn btn-primary" onClick={handleSave}>
+        Save Pattern
+      </button>
+    </div>,
   );
 }

@@ -23,15 +23,21 @@ export function UploadStep({ onImageLoaded, loadImage = loadImageBuffer }: Uploa
   };
 
   return (
-    <div>
+    <div className="container-narrow" style={{ padding: 0 }}>
       <h2>Upload a digital pixel art image</h2>
-      <label htmlFor="upload-image-input">Upload image</label>
-      <input
-        id="upload-image-input"
-        type="file"
-        accept="image/*"
-        onChange={handleFileChange}
-      />
+      <p className="hint">PNG or JPEG. We'll help you confirm the grid size next.</p>
+      <div className="upload-dropzone">
+        <div className="upload-dropzone-label">
+          <span style={{ fontSize: 32 }} aria-hidden="true">
+            🖼
+          </span>
+          <strong>Drop an image here or click to browse</strong>
+        </div>
+        <label htmlFor="upload-image-input" className="visually-hidden">
+          Upload image
+        </label>
+        <input id="upload-image-input" type="file" accept="image/*" onChange={handleFileChange} />
+      </div>
       {error && <p role="alert">{error}</p>}
     </div>
   );
