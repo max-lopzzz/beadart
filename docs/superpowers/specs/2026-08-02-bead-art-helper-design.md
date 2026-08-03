@@ -111,7 +111,7 @@ Rejected alternatives:
   (e.g. 2000px) before processing, to keep in-browser image processing
   performant.
 - **IndexedDB storage limits**: store only compressed thumbnails (not
-  full-res source photos) long-term.
+  full-res source images) long-term.
 
 ## Testing Approach
 
