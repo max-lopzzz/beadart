@@ -127,4 +127,43 @@ describe('CornerStep', () => {
     await waitFor(() => expect(onGridReady).toHaveBeenCalledWith(resultGrid));
     expect(sampleGrid).toHaveBeenCalledWith(image, sampleQuad, 5, 6);
   });
+
+  it('falls back to the image bounding box and shows an error when detection throws', async () => {
+    const detectCorners = vi.fn().mockRejectedValue(new Error('opencv failed to load'));
+    render(
+      <CornerStep
+        image={makeImage(200, 200)}
+        onGridReady={vi.fn()}
+        detectCorners={detectCorners}
+        sampleGrid={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText('topLeft handle')).toBeInTheDocument());
+    expect(screen.queryByText(/detecting grid/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('opencv failed to load');
+  });
+
+  it('shows an error and re-enables Continue when sampleGrid rejects', async () => {
+    const detectCorners = vi.fn().mockResolvedValue(sampleQuad);
+    const sampleGrid = vi.fn().mockRejectedValue(new Error('warp failed'));
+    const onGridReady = vi.fn();
+    render(
+      <CornerStep
+        image={makeImage(200, 200)}
+        onGridReady={onGridReady}
+        detectCorners={detectCorners}
+        sampleGrid={sampleGrid}
+      />,
+    );
+    await waitFor(() => screen.getByLabelText('topLeft handle'));
+
+    const continueButton = screen.getByRole('button', { name: /continue/i });
+    await userEvent.click(continueButton);
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('warp failed'));
+    expect(onGridReady).not.toHaveBeenCalled();
+    expect(continueButton).not.toBeDisabled();
+    expect(continueButton).toHaveTextContent(/continue/i);
+  });
 });

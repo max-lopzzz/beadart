@@ -60,6 +60,7 @@ export function CornerStep({
   const [colsInput, setColsInput] = useState(String(DEFAULT_COLS));
   const [processing, setProcessing] = useState(false);
   const [dragging, setDragging] = useState<CornerKey | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const rows = parsePositiveInt(rowsInput);
@@ -71,10 +72,18 @@ export function CornerStep({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const detected = await detectCorners(image);
-      if (cancelled) return;
-      setCorners(detected ?? defaultQuad(image.width, image.height));
-      setDetecting(false);
+      try {
+        const detected = await detectCorners(image);
+        if (cancelled) return;
+        setCorners(detected ?? defaultQuad(image.width, image.height));
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setCorners(defaultQuad(image.width, image.height));
+        setError(err instanceof Error ? err.message : 'Failed to detect the grid');
+      } finally {
+        if (!cancelled) setDetecting(false);
+      }
     })();
     return () => {
       cancelled = true;
@@ -110,8 +119,14 @@ export function CornerStep({
 
   const handleContinue = async () => {
     setProcessing(true);
-    const grid = await sampleGrid(image, corners, rows, cols);
-    onGridReady(grid);
+    try {
+      const grid = await sampleGrid(image, corners, rows, cols);
+      setError(null);
+      onGridReady(grid);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process the grid');
+      setProcessing(false);
+    }
   };
 
   const cornerEntries = Object.entries(corners) as [CornerKey, Point][];
@@ -119,6 +134,7 @@ export function CornerStep({
   return (
     <div>
       <h2>Adjust the grid corners</h2>
+      {error && <p role="alert">{error}</p>}
       <div
         style={{ position: 'relative', width: displayWidth, height: displayHeight }}
         onPointerMove={handlePointerMove}
