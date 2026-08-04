@@ -14,8 +14,21 @@ function getPixel(image: ImageBuffer, x: number, y: number): [number, number, nu
   return [image.data[idx], image.data[idx + 1], image.data[idx + 2]];
 }
 
-function pixelsEqual(a: [number, number, number], b: [number, number, number]): boolean {
-  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+// Real source images (JPEG screenshots/photos of a pattern, or a browser
+// color-managing a wide-gamut profile) carry a few units of per-pixel noise
+// even within a single flat design color. Requiring exact equality treats
+// that noise as a boundary everywhere, so the detected "block size" degenerates
+// to 1px. A small tolerance absorbs compression noise while still treating a
+// genuine jump between two distinct design colors (usually 50+ per channel)
+// as a real boundary.
+const NOISE_TOLERANCE = 24;
+
+function pixelsSimilar(a: [number, number, number], b: [number, number, number]): boolean {
+  return (
+    Math.abs(a[0] - b[0]) <= NOISE_TOLERANCE &&
+    Math.abs(a[1] - b[1]) <= NOISE_TOLERANCE &&
+    Math.abs(a[2] - b[2]) <= NOISE_TOLERANCE
+  );
 }
 
 function mode(values: number[]): number | null {
@@ -46,7 +59,7 @@ function detectBlockWidth(image: ImageBuffer): number | null {
   const changeCounts = new Array(image.width).fill(0);
   for (let y = 0; y < image.height; y++) {
     for (let x = 1; x < image.width; x++) {
-      if (!pixelsEqual(getPixel(image, x, y), getPixel(image, x - 1, y))) {
+      if (!pixelsSimilar(getPixel(image, x, y), getPixel(image, x - 1, y))) {
         changeCounts[x]++;
       }
     }
@@ -66,7 +79,7 @@ function detectBlockHeight(image: ImageBuffer): number | null {
   const changeCounts = new Array(image.height).fill(0);
   for (let x = 0; x < image.width; x++) {
     for (let y = 1; y < image.height; y++) {
-      if (!pixelsEqual(getPixel(image, x, y), getPixel(image, x, y - 1))) {
+      if (!pixelsSimilar(getPixel(image, x, y), getPixel(image, x, y - 1))) {
         changeCounts[y]++;
       }
     }

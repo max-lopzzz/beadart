@@ -18,11 +18,22 @@ export function WorkingView({
   onBack,
   renderExport = renderPatternToDataUrl,
 }: WorkingViewProps) {
-  const { patterns, loading: patternsLoading, toggleColorCompleted, replaceColor } = usePatterns();
+  const {
+    patterns,
+    loading: patternsLoading,
+    toggleColorCompleted,
+    replaceColor,
+    renamePattern,
+    setCellColor,
+  } = usePatterns();
   const { palettes, loading: palettesLoading } = usePalettes();
   const [activeColors, setActiveColors] = useState<Set<string>>(new Set());
   const [exportUrl, setExportUrl] = useState<string | null>(null);
   const [replacingColor, setReplacingColor] = useState<string | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [editMode, setEditMode] = useState(false);
+  const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
 
   if (patternsLoading || palettesLoading) {
     return <div>Loading...</div>;
@@ -51,10 +62,21 @@ export function WorkingView({
     });
   };
 
+  const handleRename = async () => {
+    await renamePattern(pattern.id, renameValue.trim() || pattern.name);
+    setIsRenaming(false);
+  };
+
   const handleReplace = async (newColorName: string) => {
     if (!replacingColor) return;
     await replaceColor(pattern.id, replacingColor, newColorName);
     setReplacingColor(null);
+  };
+
+  const handleSetCellColor = async (colorName: string) => {
+    if (!editingCell) return;
+    await setCellColor(pattern.id, editingCell.row, editingCell.col, colorName);
+    setEditingCell(null);
   };
 
   const handleExport = () => {
@@ -72,7 +94,38 @@ export function WorkingView({
           ← Back
         </button>
         <div className="working-title">
-          <h2>{pattern.name}</h2>
+          {isRenaming ? (
+            <div className="field-row" style={{ alignItems: 'flex-end', margin: 0 }}>
+              <div className="field" style={{ margin: 0, flex: 1 }}>
+                <label htmlFor="pattern-rename-input">Pattern name</label>
+                <input
+                  id="pattern-rename-input"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={handleRename}>
+                Save name
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setIsRenaming(false)}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="working-title-row">
+              <h2>{pattern.name}</h2>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setRenameValue(pattern.name);
+                  setIsRenaming(true);
+                }}
+              >
+                Rename
+              </button>
+            </div>
+          )}
         </div>
         <div className="working-progress">
           <ProgressBar percent={percent} />
@@ -81,24 +134,50 @@ export function WorkingView({
       </div>
       <div className="working-layout">
         <div className="pixel-grid-wrap surface" style={{ padding: 'var(--space-3)' }}>
+          <div className="legend-header">
+            <p className="hint" style={{ margin: 0 }}>
+              {editMode ? 'Click a cell to change its color.' : 'Made a mistake on a cell?'}
+            </p>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setEditMode((prev) => !prev);
+                setEditingCell(null);
+              }}
+            >
+              {editMode ? 'Done editing' : 'Edit cells'}
+            </button>
+          </div>
           <table>
             <tbody>
               {pattern.cellColors.map((row, rowIndex) => (
                 <tr key={rowIndex}>
                   {row.map((colorName, colIndex) => {
                     const dimmed = activeColors.size > 0 && !activeColors.has(colorName);
+                    const cellStyle = {
+                      width: 22,
+                      height: 22,
+                      backgroundColor: dimmed ? 'var(--border)' : hexByName.get(colorName),
+                    };
+                    const cellLabel = `cell ${rowIndex}-${colIndex}, color ${colorName}`;
                     return (
                       <td key={colIndex}>
-                        <div
-                          className="pixel-cell"
-                          aria-label={`cell ${rowIndex}-${colIndex}, color ${colorName}`}
-                          data-dimmed={dimmed ? 'true' : 'false'}
-                          style={{
-                            width: 22,
-                            height: 22,
-                            backgroundColor: dimmed ? 'var(--border)' : hexByName.get(colorName),
-                          }}
-                        />
+                        {editMode ? (
+                          <button
+                            className="pixel-cell"
+                            aria-label={cellLabel}
+                            data-dimmed={dimmed ? 'true' : 'false'}
+                            style={cellStyle}
+                            onClick={() => setEditingCell({ row: rowIndex, col: colIndex })}
+                          />
+                        ) : (
+                          <div
+                            className="pixel-cell"
+                            aria-label={cellLabel}
+                            data-dimmed={dimmed ? 'true' : 'false'}
+                            style={cellStyle}
+                          />
+                        )}
                       </td>
                     );
                   })}
@@ -106,6 +185,21 @@ export function WorkingView({
               ))}
             </tbody>
           </table>
+          {editingCell && (
+            <div className="swatch-picker" role="group" aria-label="Choose a color for this cell">
+              {palette.colors.map((option) => (
+                <button
+                  key={option.name}
+                  className="bead-btn"
+                  aria-label={`Set cell to ${option.name}`}
+                  style={{ backgroundColor: option.hex, color: contrastTextColor(option.hex) }}
+                  onClick={() => handleSetCellColor(option.name)}
+                >
+                  {option.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="surface" style={{ padding: 'var(--space-3)' }}>
           <div className="legend-header">

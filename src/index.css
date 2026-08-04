@@ -775,6 +775,12 @@ label {
   margin: 0;
 }
 
+.working-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .working-progress {
   display: flex;
   align-items: center;

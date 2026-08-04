@@ -64,3 +64,38 @@ export async function replaceColorInPattern(
   await db.put('patterns', updated);
   return updated;
 }
+
+export async function renamePattern(patternId: string, name: string): Promise<Pattern> {
+  const db = await getDb();
+  const pattern = await db.get('patterns', patternId);
+  if (!pattern) {
+    throw new Error(`Pattern "${patternId}" not found`);
+  }
+
+  const updated: Pattern = { ...pattern, name };
+  await db.put('patterns', updated);
+  return updated;
+}
+
+export async function setCellColor(
+  patternId: string,
+  row: number,
+  col: number,
+  newColor: string,
+): Promise<Pattern> {
+  const db = await getDb();
+  const pattern = await db.get('patterns', patternId);
+  if (!pattern) {
+    throw new Error(`Pattern "${patternId}" not found`);
+  }
+
+  const cellColors = pattern.cellColors.map((rowColors, rowIndex) =>
+    rowIndex === row
+      ? rowColors.map((colorName, colIndex) => (colIndex === col ? newColor : colorName))
+      : rowColors,
+  );
+
+  const updated: Pattern = { ...pattern, cellColors };
+  await db.put('patterns', updated);
+  return updated;
+}

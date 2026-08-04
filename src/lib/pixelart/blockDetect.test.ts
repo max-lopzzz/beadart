@@ -29,6 +29,23 @@ function makeCheckerboard(
   return { width, height, data };
 }
 
+function addNoise(image: ImageBuffer, amplitude: number): ImageBuffer {
+  const noisy = new Uint8ClampedArray(image.data);
+  for (let y = 0; y < image.height; y++) {
+    for (let x = 0; x < image.width; x++) {
+      const idx = (y * image.width + x) * 4;
+      // Deterministic pseudo-noise in [-amplitude, amplitude], varying per pixel
+      // to simulate JPEG compression noise between adjacent same-color pixels.
+      const n = ((x * 37 + y * 17) % (amplitude * 2 + 1)) - amplitude;
+      noisy[idx] = image.data[idx] + n;
+      noisy[idx + 1] = image.data[idx + 1] + n;
+      noisy[idx + 2] = image.data[idx + 2] + n;
+      noisy[idx + 3] = 255;
+    }
+  }
+  return { width: image.width, height: image.height, data: noisy };
+}
+
 describe('detectBlockSize', () => {
   it('detects a square block size from a checkerboard pattern', () => {
     const image = makeCheckerboard(3, 3, 2, 2);
@@ -38,6 +55,12 @@ describe('detectBlockSize', () => {
   it('detects a non-square block size', () => {
     const image = makeCheckerboard(4, 5, 3, 2);
     expect(detectBlockSize(image)).toEqual({ blockWidth: 4, blockHeight: 5 });
+  });
+
+  it('detects the block size despite small per-pixel noise, like JPEG compression', () => {
+    const clean = makeCheckerboard(6, 6, 3, 3);
+    const noisy = addNoise(clean, 6);
+    expect(detectBlockSize(noisy)).toEqual({ blockWidth: 6, blockHeight: 6 });
   });
 
   it('returns null for a solid-color image with no detectable grid', () => {

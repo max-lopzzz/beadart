@@ -140,6 +140,39 @@ describe('WorkingView', () => {
     expect(screen.queryByText(/^Red ×/)).not.toBeInTheDocument();
   });
 
+  it('renames the pattern via the header rename control', async () => {
+    await savePalette(palette);
+    await savePattern(pattern);
+    render(<WorkingView patternId="pattern-1" onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText('My Pattern')).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: /rename/i }));
+
+    const input = screen.getByLabelText(/pattern name/i);
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Renamed Pattern');
+    await userEvent.click(screen.getByRole('button', { name: /save name/i }));
+
+    await waitFor(() => expect(screen.getByText('Renamed Pattern')).toBeInTheDocument());
+    expect(screen.queryByText('My Pattern')).not.toBeInTheDocument();
+  });
+
+  it('lets you recolor a single cell in edit mode without affecting other cells of the same color', async () => {
+    await savePalette(palette);
+    await savePattern({ ...pattern, id: 'pattern-2', cellColors: [['Red', 'Red']] });
+    render(<WorkingView patternId="pattern-2" onBack={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('Red × 2'));
+    await userEvent.click(screen.getByRole('button', { name: /edit cells/i }));
+    await userEvent.click(screen.getByLabelText('cell 0-0, color Red'));
+    await userEvent.click(screen.getByRole('button', { name: /set cell to blue/i }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('cell 0-0, color Blue')).toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText('cell 0-1, color Red')).toBeInTheDocument();
+  });
+
   it('calls renderExport with the active color filter when Export is clicked', async () => {
     await savePalette(palette);
     await savePattern(pattern);

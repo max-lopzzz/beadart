@@ -75,4 +75,28 @@ describe('usePatterns', () => {
     });
     expect(result.current.patterns[0].cellColors).toEqual([['B1']]);
   });
+
+  it('renamePattern updates the name on the pattern in state', async () => {
+    const { result } = renderHook(() => usePatterns());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.addPattern(makePattern());
+    });
+    await act(async () => {
+      await result.current.renamePattern('pattern-1', 'New Name');
+    });
+    expect(result.current.patterns[0].name).toBe('New Name');
+  });
+
+  it('setCellColor updates a single cell on the pattern in state', async () => {
+    const { result } = renderHook(() => usePatterns());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.addPattern(makePattern());
+    });
+    await act(async () => {
+      await result.current.setCellColor('pattern-1', 0, 0, 'B1');
+    });
+    expect(result.current.patterns[0].cellColors).toEqual([['B1']]);
+  });
 });

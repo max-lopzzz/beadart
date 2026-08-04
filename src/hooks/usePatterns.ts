@@ -3,8 +3,10 @@ import { Pattern } from '../types/pattern';
 import {
   deletePattern,
   listPatterns,
+  renamePattern as renamePatternInStorage,
   replaceColorInPattern,
   savePattern,
+  setCellColor as setCellColorInStorage,
   setColorCompleted,
 } from '../lib/storage/patternsRepo';
 
@@ -55,5 +57,30 @@ export function usePatterns() {
     [refresh],
   );
 
-  return { patterns, loading, addPattern, removePattern, toggleColorCompleted, replaceColor };
+  const renamePattern = useCallback(
+    async (patternId: string, name: string) => {
+      await renamePatternInStorage(patternId, name);
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const setCellColor = useCallback(
+    async (patternId: string, row: number, col: number, colorName: string) => {
+      await setCellColorInStorage(patternId, row, col, colorName);
+      await refresh();
+    },
+    [refresh],
+  );
+
+  return {
+    patterns,
+    loading,
+    addPattern,
+    removePattern,
+    toggleColorCompleted,
+    replaceColor,
+    renamePattern,
+    setCellColor,
+  };
 }

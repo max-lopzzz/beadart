@@ -7,6 +7,8 @@ import {
   deletePattern,
   setColorCompleted,
   replaceColorInPattern,
+  renamePattern,
+  setCellColor,
 } from './patternsRepo';
 import { Pattern } from '../../types/pattern';
 
@@ -86,5 +88,29 @@ describe('patternsRepo', () => {
 
   it('throws when replacing a color on a missing pattern', async () => {
     await expect(replaceColorInPattern('missing', 'A1', 'B1')).rejects.toThrow('not found');
+  });
+
+  it('renames a pattern', async () => {
+    await savePattern(makePattern());
+    const updated = await renamePattern('pattern-1', 'New Name');
+    expect(updated.name).toBe('New Name');
+    expect(await getPattern('pattern-1')).toMatchObject({ name: 'New Name' });
+  });
+
+  it('throws when renaming a missing pattern', async () => {
+    await expect(renamePattern('missing', 'New Name')).rejects.toThrow('not found');
+  });
+
+  it('sets the color of a single cell without affecting others', async () => {
+    await savePattern(makePattern({ cellColors: [['A1', 'A2'], ['A3', 'A4']] }));
+    const updated = await setCellColor('pattern-1', 0, 1, 'B1');
+    expect(updated.cellColors).toEqual([
+      ['A1', 'B1'],
+      ['A3', 'A4'],
+    ]);
+  });
+
+  it('throws when setting a cell color on a missing pattern', async () => {
+    await expect(setCellColor('missing', 0, 0, 'A1')).rejects.toThrow('not found');
   });
 });
