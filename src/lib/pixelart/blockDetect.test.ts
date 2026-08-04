@@ -119,10 +119,23 @@ describe('detectBlockSize', () => {
     // that motivated this) rarely repeat with zero variation: JPEG noise and
     // uneven crop margins mean the line-width and fill-width gap counts end
     // up close but not perfectly equal, unlike the idealized exact-tie cases
-    // above. This is the scenario that an exact-tie check misses.
+    // above.
     const clean = makeGridOverlayCheckerboard(9, 6, 6, 1);
     const noisy = addNoise(clean, 6);
     expect(detectBlockSize(noisy)).toEqual({ blockWidth: 9, blockHeight: 9 });
+  });
+
+  it('detects a consistent block size on both axes of a non-square noisy grid overlay', () => {
+    // A real bug report: on an actual photo, width detection returned garbage
+    // (the line width) while height correctly detected the block size, on the
+    // very same image. The two axes see different noise, which happened to
+    // land width's "line vs fill" gap-count ratio just below a fixed
+    // threshold while height's landed just above it - a coin flip, not a fix.
+    // A non-square block count (23 x 27, matching the real report) is enough
+    // to make width and height noise diverge the same way.
+    const clean = makeGridOverlayCheckerboard(11, 23, 27, 1);
+    const noisy = addNoise(clean, 8);
+    expect(detectBlockSize(noisy)).toEqual({ blockWidth: 11, blockHeight: 11 });
   });
 
   it('returns null for a solid-color image with no detectable grid', () => {
