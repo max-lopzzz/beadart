@@ -157,7 +157,7 @@ describe('WorkingView', () => {
     expect(screen.queryByText('My Pattern')).not.toBeInTheDocument();
   });
 
-  it('lets you recolor a single cell in edit mode without affecting other cells of the same color', async () => {
+  it('lets you recolor a single selected cell in edit mode without affecting other cells of the same color', async () => {
     await savePalette(palette);
     await savePattern({ ...pattern, id: 'pattern-2', cellColors: [['Red', 'Red']] });
     render(<WorkingView patternId="pattern-2" onBack={vi.fn()} />);
@@ -165,12 +165,63 @@ describe('WorkingView', () => {
     await waitFor(() => screen.getByText('Red × 2'));
     await userEvent.click(screen.getByRole('button', { name: /edit cells/i }));
     await userEvent.click(screen.getByLabelText('cell 0-0, color Red'));
-    await userEvent.click(screen.getByRole('button', { name: /set cell to blue/i }));
+    await userEvent.click(screen.getByRole('button', { name: /set selected cells to blue/i }));
 
     await waitFor(() =>
       expect(screen.getByLabelText('cell 0-0, color Blue')).toBeInTheDocument(),
     );
     expect(screen.getByLabelText('cell 0-1, color Red')).toBeInTheDocument();
+  });
+
+  it('lets you select multiple cells in edit mode and recolor them all at once', async () => {
+    await savePalette(palette);
+    await savePattern({
+      ...pattern,
+      id: 'pattern-3',
+      rows: 2,
+      cols: 2,
+      cellColors: [
+        ['Red', 'Blue'],
+        ['Blue', 'Red'],
+      ],
+    });
+    render(<WorkingView patternId="pattern-3" onBack={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('Red × 2'));
+    await userEvent.click(screen.getByRole('button', { name: /edit cells/i }));
+    await userEvent.click(screen.getByLabelText('cell 0-0, color Red'));
+    await userEvent.click(screen.getByLabelText('cell 1-1, color Red'));
+    expect(screen.getByText('2 cells selected')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /set selected cells to blue/i }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('cell 0-0, color Blue')).toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText('cell 1-1, color Blue')).toBeInTheDocument();
+    expect(screen.getByLabelText('cell 0-1, color Blue')).toBeInTheDocument();
+    expect(screen.getByLabelText('cell 1-0, color Blue')).toBeInTheDocument();
+  });
+
+  it('toggles a cell out of the selection when clicked again, and Clear selection deselects all', async () => {
+    await savePalette(palette);
+    await savePattern({ ...pattern, id: 'pattern-4', cellColors: [['Red', 'Blue']] });
+    render(<WorkingView patternId="pattern-4" onBack={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('Red × 1'));
+    await userEvent.click(screen.getByRole('button', { name: /edit cells/i }));
+    await userEvent.click(screen.getByLabelText('cell 0-0, color Red'));
+    await userEvent.click(screen.getByLabelText('cell 0-1, color Blue'));
+    expect(screen.getByText('2 cells selected')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText('cell 0-1, color Blue'));
+    expect(screen.getByText('1 cell selected')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /clear selection/i }));
+    expect(screen.queryByText(/cell.*selected/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /set selected cells to/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('calls renderExport with the active color filter when Export is clicked', async () => {

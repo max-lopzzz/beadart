@@ -24,7 +24,7 @@ export function WorkingView({
     toggleColorCompleted,
     replaceColor,
     renamePattern,
-    setCellColor,
+    setCellsColor,
   } = usePatterns();
   const { palettes, loading: palettesLoading } = usePalettes();
   const [activeColors, setActiveColors] = useState<Set<string>>(new Set());
@@ -33,7 +33,7 @@ export function WorkingView({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [editMode, setEditMode] = useState(false);
-  const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
 
   if (patternsLoading || palettesLoading) {
     return <div>Loading...</div>;
@@ -73,10 +73,26 @@ export function WorkingView({
     setReplacingColor(null);
   };
 
-  const handleSetCellColor = async (colorName: string) => {
-    if (!editingCell) return;
-    await setCellColor(pattern.id, editingCell.row, editingCell.col, colorName);
-    setEditingCell(null);
+  const toggleCellSelection = (row: number, col: number) => {
+    const key = `${row}-${col}`;
+    setSelectedCells((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const handleSetSelectedCellsColor = async (colorName: string) => {
+    const cells = Array.from(selectedCells, (key) => {
+      const [row, col] = key.split('-').map(Number);
+      return { row, col };
+    });
+    await setCellsColor(pattern.id, cells, colorName);
+    setSelectedCells(new Set());
   };
 
   const handleExport = () => {
@@ -142,7 +158,7 @@ export function WorkingView({
               className="btn btn-ghost btn-sm"
               onClick={() => {
                 setEditMode((prev) => !prev);
-                setEditingCell(null);
+                setSelectedCells(new Set());
               }}
             >
               {editMode ? 'Done editing' : 'Edit cells'}
@@ -154,6 +170,7 @@ export function WorkingView({
                 <tr key={rowIndex}>
                   {row.map((colorName, colIndex) => {
                     const dimmed = activeColors.size > 0 && !activeColors.has(colorName);
+                    const isSelected = selectedCells.has(`${rowIndex}-${colIndex}`);
                     const cellStyle = {
                       width: 22,
                       height: 22,
@@ -167,8 +184,9 @@ export function WorkingView({
                             className="pixel-cell"
                             aria-label={cellLabel}
                             data-dimmed={dimmed ? 'true' : 'false'}
+                            data-selected={isSelected ? 'true' : 'false'}
                             style={cellStyle}
-                            onClick={() => setEditingCell({ row: rowIndex, col: colIndex })}
+                            onClick={() => toggleCellSelection(rowIndex, colIndex)}
                           />
                         ) : (
                           <div
@@ -185,19 +203,36 @@ export function WorkingView({
               ))}
             </tbody>
           </table>
-          {editingCell && (
-            <div className="swatch-picker" role="group" aria-label="Choose a color for this cell">
-              {palette.colors.map((option) => (
+          {selectedCells.size > 0 && (
+            <div className="cell-edit-panel">
+              <div className="legend-header">
+                <p className="hint" style={{ margin: 0 }}>
+                  {selectedCells.size} cell{selectedCells.size === 1 ? '' : 's'} selected
+                </p>
                 <button
-                  key={option.name}
-                  className="bead-btn"
-                  aria-label={`Set cell to ${option.name}`}
-                  style={{ backgroundColor: option.hex, color: contrastTextColor(option.hex) }}
-                  onClick={() => handleSetCellColor(option.name)}
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setSelectedCells(new Set())}
                 >
-                  {option.name}
+                  Clear selection
                 </button>
-              ))}
+              </div>
+              <div
+                className="swatch-picker"
+                role="group"
+                aria-label="Choose a color for the selected cells"
+              >
+                {palette.colors.map((option) => (
+                  <button
+                    key={option.name}
+                    className="bead-btn"
+                    aria-label={`Set selected cells to ${option.name}`}
+                    style={{ backgroundColor: option.hex, color: contrastTextColor(option.hex) }}
+                    onClick={() => handleSetSelectedCellsColor(option.name)}
+                  >
+                    {option.name}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>

@@ -822,6 +822,19 @@ label {
   transition: opacity 0.15s ease;
 }
 
+.pixel-cell[data-selected='true'] {
+  outline: 2px solid var(--coral);
+  outline-offset: -2px;
+  position: relative;
+  z-index: 1;
+}
+
+.cell-edit-panel {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
 .legend-header {
   display: flex;
   align-items: center;

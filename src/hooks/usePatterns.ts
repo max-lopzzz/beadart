@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pattern } from '../types/pattern';
 import {
+  CellPosition,
   deletePattern,
   listPatterns,
   renamePattern as renamePatternInStorage,
   replaceColorInPattern,
   savePattern,
-  setCellColor as setCellColorInStorage,
+  setCellsColor as setCellsColorInStorage,
   setColorCompleted,
 } from '../lib/storage/patternsRepo';
 
@@ -65,9 +66,9 @@ export function usePatterns() {
     [refresh],
   );
 
-  const setCellColor = useCallback(
-    async (patternId: string, row: number, col: number, colorName: string) => {
-      await setCellColorInStorage(patternId, row, col, colorName);
+  const setCellsColor = useCallback(
+    async (patternId: string, cells: CellPosition[], colorName: string) => {
+      await setCellsColorInStorage(patternId, cells, colorName);
       await refresh();
     },
     [refresh],
@@ -81,6 +82,6 @@ export function usePatterns() {
     toggleColorCompleted,
     replaceColor,
     renamePattern,
-    setCellColor,
+    setCellsColor,
   };
 }

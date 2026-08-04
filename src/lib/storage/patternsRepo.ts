@@ -77,10 +77,14 @@ export async function renamePattern(patternId: string, name: string): Promise<Pa
   return updated;
 }
 
-export async function setCellColor(
+export interface CellPosition {
+  row: number;
+  col: number;
+}
+
+export async function setCellsColor(
   patternId: string,
-  row: number,
-  col: number,
+  cells: CellPosition[],
   newColor: string,
 ): Promise<Pattern> {
   const db = await getDb();
@@ -89,10 +93,11 @@ export async function setCellColor(
     throw new Error(`Pattern "${patternId}" not found`);
   }
 
+  const targets = new Set(cells.map(({ row, col }) => `${row}-${col}`));
   const cellColors = pattern.cellColors.map((rowColors, rowIndex) =>
-    rowIndex === row
-      ? rowColors.map((colorName, colIndex) => (colIndex === col ? newColor : colorName))
-      : rowColors,
+    rowColors.map((colorName, colIndex) =>
+      targets.has(`${rowIndex}-${colIndex}`) ? newColor : colorName,
+    ),
   );
 
   const updated: Pattern = { ...pattern, cellColors };
