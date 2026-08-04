@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pattern } from '../types/pattern';
+import { Palette } from '../types/palette';
+import { renderPatternToDataUrl } from '../lib/image/renderPattern';
 import {
   CellPosition,
   deletePattern,
@@ -11,7 +13,11 @@ import {
   setColorCompleted,
 } from '../lib/storage/patternsRepo';
 
-export function usePatterns() {
+interface UsePatternsOptions {
+  renderThumbnail?: typeof renderPatternToDataUrl;
+}
+
+export function usePatterns({ renderThumbnail = renderPatternToDataUrl }: UsePatternsOptions = {}) {
   const [patterns, setPatterns] = useState<Pattern[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,11 +57,16 @@ export function usePatterns() {
   );
 
   const replaceColor = useCallback(
-    async (patternId: string, fromColor: string, toColor: string) => {
-      await replaceColorInPattern(patternId, fromColor, toColor);
+    async (patternId: string, fromColor: string, toColor: string, palette: Palette) => {
+      const updated = await replaceColorInPattern(patternId, fromColor, toColor);
+      // The stored thumbnail is a pre-rendered snapshot (see NewPatternWizard) -
+      // changing cellColors without regenerating it would leave the home
+      // screen showing the pre-edit image.
+      const thumbnail = renderThumbnail(updated, palette, { maxSize: 200 });
+      await savePattern({ ...updated, thumbnail });
       await refresh();
     },
-    [refresh],
+    [refresh, renderThumbnail],
   );
 
   const renamePattern = useCallback(
@@ -67,11 +78,13 @@ export function usePatterns() {
   );
 
   const setCellsColor = useCallback(
-    async (patternId: string, cells: CellPosition[], colorName: string) => {
-      await setCellsColorInStorage(patternId, cells, colorName);
+    async (patternId: string, cells: CellPosition[], colorName: string, palette: Palette) => {
+      const updated = await setCellsColorInStorage(patternId, cells, colorName);
+      const thumbnail = renderThumbnail(updated, palette, { maxSize: 200 });
+      await savePattern({ ...updated, thumbnail });
       await refresh();
     },
-    [refresh],
+    [refresh, renderThumbnail],
   );
 
   return {

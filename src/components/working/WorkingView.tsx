@@ -11,12 +11,14 @@ interface WorkingViewProps {
   patternId: string;
   onBack: () => void;
   renderExport?: typeof renderPatternToDataUrl;
+  renderThumbnail?: typeof renderPatternToDataUrl;
 }
 
 export function WorkingView({
   patternId,
   onBack,
   renderExport = renderPatternToDataUrl,
+  renderThumbnail = renderPatternToDataUrl,
 }: WorkingViewProps) {
   const {
     patterns,
@@ -25,7 +27,7 @@ export function WorkingView({
     replaceColor,
     renamePattern,
     setCellsColor,
-  } = usePatterns();
+  } = usePatterns({ renderThumbnail });
   const { palettes, loading: palettesLoading } = usePalettes();
   const [activeColors, setActiveColors] = useState<Set<string>>(new Set());
   const [exportUrl, setExportUrl] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export function WorkingView({
 
   const handleReplace = async (newColorName: string) => {
     if (!replacingColor) return;
-    await replaceColor(pattern.id, replacingColor, newColorName);
+    await replaceColor(pattern.id, replacingColor, newColorName, palette);
     setReplacingColor(null);
   };
 
@@ -91,7 +93,7 @@ export function WorkingView({
       const [row, col] = key.split('-').map(Number);
       return { row, col };
     });
-    await setCellsColor(pattern.id, cells, colorName);
+    await setCellsColor(pattern.id, cells, colorName, palette);
     setSelectedCells(new Set());
   };
 

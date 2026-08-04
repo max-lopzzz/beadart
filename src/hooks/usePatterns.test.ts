@@ -1,8 +1,20 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { resetDbForTests } from '../lib/storage/db';
 import { usePatterns } from './usePatterns';
 import { Pattern } from '../types/pattern';
+import { Palette } from '../types/palette';
+
+const palette: Palette = {
+  id: 'default-bead-palette',
+  name: 'Test',
+  isBuiltIn: false,
+  colors: [
+    { name: 'A1', hex: '#ff0000' },
+    { name: 'A2', hex: '#00ff00' },
+    { name: 'B1', hex: '#0000ff' },
+  ],
+};
 
 afterEach(async () => {
   resetDbForTests();
@@ -65,15 +77,38 @@ describe('usePatterns', () => {
   });
 
   it('replaceColor updates cellColors on the pattern in state', async () => {
-    const { result } = renderHook(() => usePatterns());
+    const renderThumbnail = vi.fn().mockReturnValue('data:image/png;base64,thumb');
+    const { result } = renderHook(() => usePatterns({ renderThumbnail }));
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => {
       await result.current.addPattern(makePattern());
     });
     await act(async () => {
-      await result.current.replaceColor('pattern-1', 'A1', 'B1');
+      await result.current.replaceColor('pattern-1', 'A1', 'B1', palette);
     });
     expect(result.current.patterns[0].cellColors).toEqual([['B1']]);
+  });
+
+  it('replaceColor regenerates the thumbnail so it reflects the edited colors', async () => {
+    // pattern.thumbnail is a pre-rendered snapshot taken once at creation
+    // time (see NewPatternWizard). If a color edit doesn't regenerate it,
+    // the home screen keeps showing the old, pre-edit image even though the
+    // pattern's actual data is fresh - the bug this test guards against.
+    const renderThumbnail = vi.fn().mockReturnValue('data:image/png;base64,updated-thumb');
+    const { result } = renderHook(() => usePatterns({ renderThumbnail }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.addPattern(makePattern({ thumbnail: 'data:image/png;base64,original' }));
+    });
+    await act(async () => {
+      await result.current.replaceColor('pattern-1', 'A1', 'B1', palette);
+    });
+    expect(result.current.patterns[0].thumbnail).toBe('data:image/png;base64,updated-thumb');
+    expect(renderThumbnail).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'pattern-1', cellColors: [['B1']] }),
+      palette,
+      { maxSize: 200 },
+    );
   });
 
   it('renamePattern updates the name on the pattern in state', async () => {
@@ -89,7 +124,8 @@ describe('usePatterns', () => {
   });
 
   it('setCellsColor updates every cell in the batch on the pattern in state', async () => {
-    const { result } = renderHook(() => usePatterns());
+    const renderThumbnail = vi.fn().mockReturnValue('data:image/png;base64,thumb');
+    const { result } = renderHook(() => usePatterns({ renderThumbnail }));
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => {
       await result.current.addPattern(makePattern({ cellColors: [['A1', 'A2']], cols: 2 }));
@@ -102,8 +138,29 @@ describe('usePatterns', () => {
           { row: 0, col: 1 },
         ],
         'B1',
+        palette,
       );
     });
     expect(result.current.patterns[0].cellColors).toEqual([['B1', 'B1']]);
+  });
+
+  it('setCellsColor regenerates the thumbnail so it reflects the edited cells', async () => {
+    const renderThumbnail = vi.fn().mockReturnValue('data:image/png;base64,updated-thumb');
+    const { result } = renderHook(() => usePatterns({ renderThumbnail }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.addPattern(
+        makePattern({ cellColors: [['A1', 'A2']], cols: 2, thumbnail: 'data:image/png;base64,original' }),
+      );
+    });
+    await act(async () => {
+      await result.current.setCellsColor('pattern-1', [{ row: 0, col: 0 }], 'B1', palette);
+    });
+    expect(result.current.patterns[0].thumbnail).toBe('data:image/png;base64,updated-thumb');
+    expect(renderThumbnail).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'pattern-1', cellColors: [['B1', 'A2']] }),
+      palette,
+      { maxSize: 200 },
+    );
   });
 });

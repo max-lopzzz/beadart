@@ -127,7 +127,8 @@ describe('WorkingView', () => {
   it('replaces a color throughout the pattern when a similar option is chosen', async () => {
     await savePalette(palette);
     await savePattern(pattern);
-    render(<WorkingView patternId="pattern-1" onBack={vi.fn()} />);
+    const renderThumbnail = vi.fn().mockReturnValue('data:image/png;base64,thumb');
+    render(<WorkingView patternId="pattern-1" onBack={vi.fn()} renderThumbnail={renderThumbnail} />);
 
     await waitFor(() => screen.getByText('Red × 1'));
     await userEvent.click(screen.getByRole('button', { name: /replace red/i }));
@@ -160,7 +161,8 @@ describe('WorkingView', () => {
   it('lets you recolor a single selected cell in edit mode without affecting other cells of the same color', async () => {
     await savePalette(palette);
     await savePattern({ ...pattern, id: 'pattern-2', cellColors: [['Red', 'Red']] });
-    render(<WorkingView patternId="pattern-2" onBack={vi.fn()} />);
+    const renderThumbnail = vi.fn().mockReturnValue('data:image/png;base64,thumb');
+    render(<WorkingView patternId="pattern-2" onBack={vi.fn()} renderThumbnail={renderThumbnail} />);
 
     await waitFor(() => screen.getByText('Red × 2'));
     await userEvent.click(screen.getByRole('button', { name: /edit cells/i }));
@@ -185,7 +187,8 @@ describe('WorkingView', () => {
         ['Blue', 'Red'],
       ],
     });
-    render(<WorkingView patternId="pattern-3" onBack={vi.fn()} />);
+    const renderThumbnail = vi.fn().mockReturnValue('data:image/png;base64,thumb');
+    render(<WorkingView patternId="pattern-3" onBack={vi.fn()} renderThumbnail={renderThumbnail} />);
 
     await waitFor(() => screen.getByText('Red × 2'));
     await userEvent.click(screen.getByRole('button', { name: /edit cells/i }));

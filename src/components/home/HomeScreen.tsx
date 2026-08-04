@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { usePatterns } from '../../hooks/usePatterns';
 import { usePalettes } from '../../hooks/usePalettes';
-import { completionPercent } from '../../lib/pattern/patternStats';
+import { colorCounts, completionPercent } from '../../lib/pattern/patternStats';
 import { aggregateColorTotals } from '../../lib/pattern/materialsSummary';
+import { Pattern } from '../../types/pattern';
+import { Palette } from '../../types/palette';
 import { ProgressRing } from '../shared/Progress';
 
 interface HomeScreenProps {
@@ -28,10 +30,17 @@ function WordmarkIcon({ size = 32 }: { size?: number }) {
   );
 }
 
+function patternUsesAnyColor(pattern: Pattern, palette: Palette | undefined, colors: Set<string>): boolean {
+  if (colors.size === 0) return true;
+  if (!palette) return false;
+  return colorCounts(pattern, palette).some((c) => colors.has(c.name));
+}
+
 export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: HomeScreenProps) {
   const { patterns, loading: patternsLoading, removePattern } = usePatterns();
   const { palettes, loading: palettesLoading } = usePalettes();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedMaterialColors, setSelectedMaterialColors] = useState<Set<string>>(new Set());
 
   if (patternsLoading || palettesLoading) {
     return <div>Loading...</div>;
@@ -39,6 +48,21 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
 
   const palettesById = new Map(palettes.map((p) => [p.id, p]));
   const materials = aggregateColorTotals(patterns, palettesById);
+  const visiblePatterns = patterns.filter((pattern) =>
+    patternUsesAnyColor(pattern, palettesById.get(pattern.paletteId), selectedMaterialColors),
+  );
+
+  const toggleMaterialColor = (colorName: string) => {
+    setSelectedMaterialColors((prev) => {
+      const next = new Set(prev);
+      if (next.has(colorName)) {
+        next.delete(colorName);
+      } else {
+        next.add(colorName);
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="container">
@@ -66,7 +90,7 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
         </div>
       ) : (
         <div className="pattern-grid">
-          {patterns.map((pattern) => {
+          {visiblePatterns.map((pattern) => {
             const palette = palettes.find((p) => p.id === pattern.paletteId);
             const percent = palette ? completionPercent(pattern, palette) : 0;
             const isDeleting = deletingId === pattern.id;
@@ -135,22 +159,45 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
       )}
       {materials.length > 0 && (
         <div className="materials-section">
-          <h3>Materials overview</h3>
-          <p className="hint">How many of each color you still need, across all patterns.</p>
+          <div className="legend-header">
+            <div>
+              <h3 style={{ marginBottom: 'var(--space-1)' }}>Materials overview</h3>
+              <p className="hint" style={{ margin: 0 }}>
+                Click a color to see which patterns use it.
+              </p>
+            </div>
+            {selectedMaterialColors.size > 0 && (
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setSelectedMaterialColors(new Set())}
+              >
+                Show all patterns
+              </button>
+            )}
+          </div>
           <ul className="materials-list">
-            {materials.map((color) => (
-              <li key={color.name} className="materials-row">
-                <span className="bead bead-md" style={{ backgroundColor: color.hex }} />
-                <span className="materials-row-name">
-                  {color.name} × {color.total}
-                </span>
-                {color.incomplete > 0 ? (
-                  <span className="materials-row-remaining">{color.incomplete} left</span>
-                ) : (
-                  <span className="materials-row-done">all placed</span>
-                )}
-              </li>
-            ))}
+            {materials.map((color) => {
+              const isActive = selectedMaterialColors.has(color.name);
+              return (
+                <li key={color.name}>
+                  <button
+                    className="materials-row"
+                    data-active={isActive ? 'true' : 'false'}
+                    onClick={() => toggleMaterialColor(color.name)}
+                  >
+                    <span className="bead bead-md" style={{ backgroundColor: color.hex }} />
+                    <span className="materials-row-name">
+                      {color.name} × {color.total}
+                    </span>
+                    {color.incomplete > 0 ? (
+                      <span className="materials-row-remaining">{color.incomplete} left</span>
+                    ) : (
+                      <span className="materials-row-done">all placed</span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

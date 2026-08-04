@@ -64,6 +64,81 @@ describe('HomeScreen', () => {
     expect(screen.getByText(`${colorB} × 1`)).toBeInTheDocument();
   });
 
+  it('filters the pattern grid to patterns using a clicked material color', async () => {
+    await savePalette(defaultPalette);
+    const colorA = defaultPalette.colors[0].name;
+    const colorB = defaultPalette.colors[1].name;
+    await savePattern({
+      id: 'pattern-1',
+      name: 'Pattern One',
+      createdAt: '2026-08-02T00:00:00.000Z',
+      rows: 1,
+      cols: 1,
+      cellColors: [[colorA]],
+      paletteId: defaultPalette.id,
+      completedColors: [],
+      thumbnail: '',
+    });
+    await savePattern({
+      id: 'pattern-2',
+      name: 'Pattern Two',
+      createdAt: '2026-08-02T00:00:00.000Z',
+      rows: 1,
+      cols: 1,
+      cellColors: [[colorB]],
+      paletteId: defaultPalette.id,
+      completedColors: [],
+      thumbnail: '',
+    });
+
+    render(<HomeScreen onOpenPattern={vi.fn()} onNewPattern={vi.fn()} onManagePalettes={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Pattern One')).toBeInTheDocument());
+    expect(screen.getByText('Pattern Two')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByText(`${colorA} × 1`));
+
+    expect(screen.getByText('Pattern One')).toBeInTheDocument();
+    expect(screen.queryByText('Pattern Two')).not.toBeInTheDocument();
+  });
+
+  it('shows all patterns again after clearing the material color filter', async () => {
+    await savePalette(defaultPalette);
+    const colorA = defaultPalette.colors[0].name;
+    const colorB = defaultPalette.colors[1].name;
+    await savePattern({
+      id: 'pattern-1',
+      name: 'Pattern One',
+      createdAt: '2026-08-02T00:00:00.000Z',
+      rows: 1,
+      cols: 1,
+      cellColors: [[colorA]],
+      paletteId: defaultPalette.id,
+      completedColors: [],
+      thumbnail: '',
+    });
+    await savePattern({
+      id: 'pattern-2',
+      name: 'Pattern Two',
+      createdAt: '2026-08-02T00:00:00.000Z',
+      rows: 1,
+      cols: 1,
+      cellColors: [[colorB]],
+      paletteId: defaultPalette.id,
+      completedColors: [],
+      thumbnail: '',
+    });
+
+    render(<HomeScreen onOpenPattern={vi.fn()} onNewPattern={vi.fn()} onManagePalettes={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Pattern One')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByText(`${colorA} × 1`));
+    expect(screen.queryByText('Pattern Two')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /show all patterns/i }));
+    expect(screen.getByText('Pattern One')).toBeInTheDocument();
+    expect(screen.getByText('Pattern Two')).toBeInTheDocument();
+  });
+
   it('lists saved patterns with their completion percent', async () => {
     await savePalette(defaultPalette);
     await savePattern({
