@@ -31,19 +31,34 @@ function pixelsSimilar(a: [number, number, number], b: [number, number, number])
   );
 }
 
+// A drawn grid overlay produces two color-change boundaries per block
+// (entering the line, then leaving it back into the fill), so the line
+// width and the fill width each show up as their own gap value with
+// close to the same count - not necessarily exactly equal, since real
+// source images (JPEG noise, uneven crop margins) rarely repeat a pattern
+// with zero variation across the whole image. If the second-most-common
+// gap comes within this fraction of the top one, treat it as this
+// two-boundary-per-block pattern and sum the pair for the true block
+// pitch; neither value alone is the block's pixel size.
+const TIED_GAP_RATIO = 0.7;
+
 function mode(values: number[]): number | null {
   if (values.length === 0) return null;
   const counts = new Map<number, number>();
   for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
-  let bestValue = values[0];
-  let bestCount = 0;
-  for (const [value, count] of counts) {
-    if (count > bestCount) {
-      bestValue = value;
-      bestCount = count;
+  // Ties broken by the larger value: relevant only as a base-case tiebreak
+  // below, since two genuinely different single-boundary-per-block gaps
+  // tying by chance is not the common case this is guarding against.
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0]);
+
+  const [topValue, topCount] = sorted[0];
+  if (sorted.length >= 2) {
+    const [secondValue, secondCount] = sorted[1];
+    if (secondCount >= topCount * TIED_GAP_RATIO) {
+      return topValue + secondValue;
     }
   }
-  return bestValue;
+  return topValue;
 }
 
 function gapsFromBoundaries(boundaries: number[]): number[] {

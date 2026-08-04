@@ -29,6 +29,43 @@ function makeCheckerboard(
   return { width, height, data };
 }
 
+function makeGridOverlayCheckerboard(
+  blockSize: number,
+  blocksX: number,
+  blocksY: number,
+  lineWidth: number,
+): ImageBuffer {
+  // A checkerboard where every block has a solid-colored line along its top
+  // and left edge, like a bead-pattern reference image with grid lines drawn
+  // over the design. Distinct from addNoise: this is a perfectly clean image
+  // with no per-pixel noise at all - the only thing being tested here is
+  // whether the gridline itself throws off detection.
+  const width = blockSize * blocksX;
+  const height = blockSize * blocksY;
+  const data = new Uint8ClampedArray(width * height * 4);
+  const colorA: [number, number, number] = [255, 0, 0];
+  const colorB: [number, number, number] = [0, 0, 255];
+  const line: [number, number, number] = [0, 0, 0];
+
+  for (let y = 0; y < height; y++) {
+    const blockY = Math.floor(y / blockSize);
+    const localY = y % blockSize;
+    for (let x = 0; x < width; x++) {
+      const blockX = Math.floor(x / blockSize);
+      const localX = x % blockSize;
+      const isLine = localX < lineWidth || localY < lineWidth;
+      const color = isLine ? line : (blockX + blockY) % 2 === 0 ? colorA : colorB;
+      const idx = (y * width + x) * 4;
+      data[idx] = color[0];
+      data[idx + 1] = color[1];
+      data[idx + 2] = color[2];
+      data[idx + 3] = 255;
+    }
+  }
+
+  return { width, height, data };
+}
+
 function addNoise(image: ImageBuffer, amplitude: number): ImageBuffer {
   const noisy = new Uint8ClampedArray(image.data);
   for (let y = 0; y < image.height; y++) {
@@ -61,6 +98,31 @@ describe('detectBlockSize', () => {
     const clean = makeCheckerboard(6, 6, 3, 3);
     const noisy = addNoise(clean, 6);
     expect(detectBlockSize(noisy)).toEqual({ blockWidth: 6, blockHeight: 6 });
+  });
+
+  it('detects the block size on a clean image with a drawn grid overlay', () => {
+    // The gridline itself produces two color-change boundaries per block (fill
+    // -> line, then line -> fill), so a naive "most common gap" can tie between
+    // the line width and the true block pitch, picking the meaningless line
+    // width instead. This has nothing to do with noise - the image is exact.
+    const image = makeGridOverlayCheckerboard(8, 3, 3, 1);
+    expect(detectBlockSize(image)).toEqual({ blockWidth: 8, blockHeight: 8 });
+  });
+
+  it('detects the block size on a grid overlay with a thicker 2px gridline', () => {
+    const image = makeGridOverlayCheckerboard(10, 3, 3, 2);
+    expect(detectBlockSize(image)).toEqual({ blockWidth: 10, blockHeight: 10 });
+  });
+
+  it('detects the block size on a noisy grid overlay, where the line/fill gap counts are close but not exactly tied', () => {
+    // Real photographed/screenshotted grid-overlay images (see the JPEG case
+    // that motivated this) rarely repeat with zero variation: JPEG noise and
+    // uneven crop margins mean the line-width and fill-width gap counts end
+    // up close but not perfectly equal, unlike the idealized exact-tie cases
+    // above. This is the scenario that an exact-tie check misses.
+    const clean = makeGridOverlayCheckerboard(9, 6, 6, 1);
+    const noisy = addNoise(clean, 6);
+    expect(detectBlockSize(noisy)).toEqual({ blockWidth: 9, blockHeight: 9 });
   });
 
   it('returns null for a solid-color image with no detectable grid', () => {
