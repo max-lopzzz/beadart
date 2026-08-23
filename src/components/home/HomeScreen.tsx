@@ -36,18 +36,24 @@ function patternUsesAnyColor(pattern: Pattern, palette: Palette | undefined, col
   return colorCounts(pattern, palette).some((c) => colors.has(c.name));
 }
 
-type SortOption = 'date-desc' | 'name-asc' | 'beads-desc' | 'completion-asc';
+type SortField = 'date' | 'name' | 'beads' | 'completion';
+type SortDirection = 'asc' | 'desc';
 
-const SORT_OPTIONS: { value: SortOption; label: string }[] = [
-  { value: 'date-desc', label: 'Date added (newest)' },
-  { value: 'name-asc', label: 'Name (A–Z)' },
-  { value: 'beads-desc', label: 'Bead count (most)' },
-  { value: 'completion-asc', label: 'Completion (least done)' },
+const SORT_FIELDS: { value: SortField; label: string; defaultDirection: SortDirection }[] = [
+  { value: 'date', label: 'Date added', defaultDirection: 'desc' },
+  { value: 'name', label: 'Name', defaultDirection: 'asc' },
+  { value: 'beads', label: 'Bead count', defaultDirection: 'desc' },
+  { value: 'completion', label: 'Completion', defaultDirection: 'asc' },
 ];
+
+function defaultDirectionFor(field: SortField): SortDirection {
+  return SORT_FIELDS.find((f) => f.value === field)?.defaultDirection ?? 'asc';
+}
 
 function sortPatterns(
   patterns: Pattern[],
-  sortBy: SortOption,
+  sortField: SortField,
+  sortDirection: SortDirection,
   palettesById: Map<string, Palette>,
 ): Pattern[] {
   const percentOf = (pattern: Pattern): number => {
@@ -55,19 +61,22 @@ function sortPatterns(
     return palette ? completionPercent(pattern, palette) : 0;
   };
 
-  const sorted = [...patterns];
-  switch (sortBy) {
-    case 'date-desc':
-      return sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    case 'name-asc':
-      return sorted.sort((a, b) => a.name.localeCompare(b.name));
-    case 'beads-desc':
-      return sorted.sort((a, b) => b.rows * b.cols - a.rows * a.cols);
-    case 'completion-asc':
-      return sorted.sort((a, b) => percentOf(a) - percentOf(b));
-    default:
-      return sorted;
-  }
+  const compare = (a: Pattern, b: Pattern): number => {
+    switch (sortField) {
+      case 'date':
+        return a.createdAt.localeCompare(b.createdAt);
+      case 'name':
+        return a.name.localeCompare(b.name);
+      case 'beads':
+        return a.rows * a.cols - b.rows * b.cols;
+      case 'completion':
+        return percentOf(a) - percentOf(b);
+      default:
+        return 0;
+    }
+  };
+
+  return [...patterns].sort((a, b) => (sortDirection === 'desc' ? -compare(a, b) : compare(a, b)));
 }
 
 export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: HomeScreenProps) {
@@ -75,7 +84,8 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
   const { palettes, loading: palettesLoading } = usePalettes();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedMaterialColors, setSelectedMaterialColors] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy] = useState<SortOption>('date-desc');
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>(defaultDirectionFor('date'));
 
   if (patternsLoading || palettesLoading) {
     return <div>Loading...</div>;
@@ -86,7 +96,12 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
   const filteredPatterns = patterns.filter((pattern) =>
     patternUsesAnyColor(pattern, palettesById.get(pattern.paletteId), selectedMaterialColors),
   );
-  const visiblePatterns = sortPatterns(filteredPatterns, sortBy, palettesById);
+  const visiblePatterns = sortPatterns(filteredPatterns, sortField, sortDirection, palettesById);
+
+  const handleSortFieldChange = (field: SortField) => {
+    setSortField(field);
+    setSortDirection(defaultDirectionFor(field));
+  };
 
   const toggleMaterialColor = (colorName: string) => {
     setSelectedMaterialColors((prev) => {
@@ -132,15 +147,23 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
             </label>
             <select
               id="pattern-sort"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              value={sortField}
+              onChange={(e) => handleSortFieldChange(e.target.value as SortField)}
             >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+              {SORT_FIELDS.map((field) => (
+                <option key={field.value} value={field.value}>
+                  {field.label}
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm pattern-toolbar-direction"
+              aria-label={sortDirection === 'asc' ? 'Sort ascending' : 'Sort descending'}
+              onClick={() => setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+            >
+              {sortDirection === 'asc' ? '↑' : '↓'}
+            </button>
           </div>
           <div className="pattern-grid">
             {visiblePatterns.map((pattern) => {
