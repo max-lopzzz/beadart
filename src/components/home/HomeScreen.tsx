@@ -36,11 +36,46 @@ function patternUsesAnyColor(pattern: Pattern, palette: Palette | undefined, col
   return colorCounts(pattern, palette).some((c) => colors.has(c.name));
 }
 
+type SortOption = 'date-desc' | 'name-asc' | 'beads-desc' | 'completion-asc';
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'date-desc', label: 'Date added (newest)' },
+  { value: 'name-asc', label: 'Name (A–Z)' },
+  { value: 'beads-desc', label: 'Bead count (most)' },
+  { value: 'completion-asc', label: 'Completion (least done)' },
+];
+
+function sortPatterns(
+  patterns: Pattern[],
+  sortBy: SortOption,
+  palettesById: Map<string, Palette>,
+): Pattern[] {
+  const percentOf = (pattern: Pattern): number => {
+    const palette = palettesById.get(pattern.paletteId);
+    return palette ? completionPercent(pattern, palette) : 0;
+  };
+
+  const sorted = [...patterns];
+  switch (sortBy) {
+    case 'date-desc':
+      return sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    case 'name-asc':
+      return sorted.sort((a, b) => a.name.localeCompare(b.name));
+    case 'beads-desc':
+      return sorted.sort((a, b) => b.rows * b.cols - a.rows * a.cols);
+    case 'completion-asc':
+      return sorted.sort((a, b) => percentOf(a) - percentOf(b));
+    default:
+      return sorted;
+  }
+}
+
 export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: HomeScreenProps) {
   const { patterns, loading: patternsLoading, removePattern } = usePatterns();
   const { palettes, loading: palettesLoading } = usePalettes();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedMaterialColors, setSelectedMaterialColors] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<SortOption>('date-desc');
 
   if (patternsLoading || palettesLoading) {
     return <div>Loading...</div>;
@@ -48,9 +83,10 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
 
   const palettesById = new Map(palettes.map((p) => [p.id, p]));
   const materials = aggregateColorTotals(patterns, palettesById);
-  const visiblePatterns = patterns.filter((pattern) =>
+  const filteredPatterns = patterns.filter((pattern) =>
     patternUsesAnyColor(pattern, palettesById.get(pattern.paletteId), selectedMaterialColors),
   );
+  const visiblePatterns = sortPatterns(filteredPatterns, sortBy, palettesById);
 
   const toggleMaterialColor = (colorName: string) => {
     setSelectedMaterialColors((prev) => {
@@ -89,8 +125,25 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
           <p>No patterns yet. Create one to get started.</p>
         </div>
       ) : (
-        <div className="pattern-grid">
-          {visiblePatterns.map((pattern) => {
+        <>
+          <div className="pattern-toolbar">
+            <label htmlFor="pattern-sort" className="pattern-toolbar-label">
+              Sort by
+            </label>
+            <select
+              id="pattern-sort"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="pattern-grid">
+            {visiblePatterns.map((pattern) => {
             const palette = palettes.find((p) => p.id === pattern.paletteId);
             const percent = palette ? completionPercent(pattern, palette) : 0;
             const isDeleting = deletingId === pattern.id;
@@ -155,7 +208,8 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
               </div>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
       {materials.length > 0 && (
         <div className="materials-section">
