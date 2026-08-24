@@ -9,10 +9,9 @@ interface UploadStepProps {
 
 export function UploadStep({ onImageLoaded, loadImage = loadImageBuffer }: UploadStepProps) {
   const [error, setError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleFile = async (file: File) => {
     setError(null);
     try {
       const image = await loadImage(file);
@@ -22,11 +21,39 @@ export function UploadStep({ onImageLoaded, loadImage = loadImageBuffer }: Uploa
     }
   };
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) handleFile(file);
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragOver(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file) handleFile(file);
+  };
+
   return (
     <div className="container-narrow" style={{ padding: 0 }}>
       <h2>Upload a digital pixel art image</h2>
       <p className="hint">PNG or JPEG. We'll help you confirm the grid size next.</p>
-      <div className="upload-dropzone">
+      <div
+        className="upload-dropzone"
+        data-testid="upload-dropzone"
+        data-drag-over={isDragOver ? 'true' : 'false'}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <div className="upload-dropzone-label">
           <span style={{ fontSize: 32 }} aria-hidden="true">
             🖼

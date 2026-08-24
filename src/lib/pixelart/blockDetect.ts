@@ -151,6 +151,13 @@ function detectBlockHeight(image: ImageBuffer): number | null {
 export function detectBlockSize(image: ImageBuffer): BlockSize | null {
   const blockWidth = detectBlockWidth(image);
   const blockHeight = detectBlockHeight(image);
-  if (blockWidth === null || blockHeight === null) return null;
-  return { blockWidth, blockHeight };
+  if (blockWidth === null && blockHeight === null) return null;
+  // Pixel art blocks are square in the overwhelming majority of real images.
+  // If only one axis produced a boundary pattern (e.g. a background gradient
+  // masks the other axis's edges), reuse that axis's block size for the
+  // missing one instead of discarding a perfectly good partial detection.
+  return {
+    blockWidth: blockWidth ?? blockHeight!,
+    blockHeight: blockHeight ?? blockWidth!,
+  };
 }

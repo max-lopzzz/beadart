@@ -150,4 +150,31 @@ describe('detectBlockSize', () => {
     }
     expect(detectBlockSize({ width, height, data })).toBeNull();
   });
+
+  it('falls back to the detected axis for the other when only one axis has a detectable grid', () => {
+    // Vertical stripes only: color varies along x but is constant down every
+    // column, so height detection finds zero boundaries and would normally
+    // give up entirely. Real pixel art overwhelmingly uses square blocks, so
+    // reusing the successfully detected width for height is a much better
+    // guess than discarding the whole detection and falling back to a blind
+    // default grid size.
+    const blockSize = 5;
+    const width = blockSize * 4;
+    const height = 17;
+    const data = new Uint8ClampedArray(width * height * 4);
+    const colorA: [number, number, number] = [255, 0, 0];
+    const colorB: [number, number, number] = [0, 0, 255];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const blockX = Math.floor(x / blockSize);
+        const color = blockX % 2 === 0 ? colorA : colorB;
+        const idx = (y * width + x) * 4;
+        data[idx] = color[0];
+        data[idx + 1] = color[1];
+        data[idx + 2] = color[2];
+        data[idx + 3] = 255;
+      }
+    }
+    expect(detectBlockSize({ width, height, data })).toEqual({ blockWidth: 5, blockHeight: 5 });
+  });
 });
