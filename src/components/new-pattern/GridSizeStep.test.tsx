@@ -53,7 +53,77 @@ describe('GridSizeStep', () => {
     await userEvent.clear(widthInput);
     await userEvent.type(widthInput, '4');
 
-    expect(screen.getByText(/4 × 2 pattern/i)).toBeInTheDocument();
+    expect(screen.getByText(/4 × 4 pattern/i)).toBeInTheDocument();
+  });
+
+  it('keeps the pixel-art dimensions linked to the image aspect ratio', async () => {
+    const image = makeCheckerboard(1, 1, 1028, 514);
+    render(<GridSizeStep image={image} onGridReady={vi.fn()} />);
+
+    const widthInput = screen.getByLabelText(/how many pixels wide/i);
+    await userEvent.clear(widthInput);
+    await userEvent.type(widthInput, '104');
+
+    expect(screen.getByLabelText(/how many pixels tall/i)).toHaveValue(52);
+  });
+
+  it('prefers explicit initial dimensions over auto-detection, for restoring after Back', () => {
+    const image = makeCheckerboard(3, 3, 2, 2);
+    render(
+      <GridSizeStep image={image} onGridReady={vi.fn()} initialCols={12} initialRows={9} />,
+    );
+
+    expect(screen.getByLabelText(/how many pixels wide/i)).toHaveValue(12);
+    expect(screen.getByLabelText(/how many pixels tall/i)).toHaveValue(9);
+  });
+
+  it('starts unlinked when restoring explicit dimensions, so editing one field does not silently overwrite a custom ratio', async () => {
+    // 12 x 9 is not the 1:1 ratio implied by this image, so it must have come
+    // from a deliberate earlier edit (e.g. the user unlinked and typed both
+    // fields by hand, or resized after Back). Defaulting linked back to true
+    // here would recompute the other field from the image's own aspect ratio
+    // the moment either field is touched, silently discarding that choice.
+    const image = makeCheckerboard(3, 3, 2, 2);
+    render(
+      <GridSizeStep image={image} onGridReady={vi.fn()} initialCols={12} initialRows={9} />,
+    );
+
+    const widthInput = screen.getByLabelText(/how many pixels wide/i);
+    await userEvent.clear(widthInput);
+    await userEvent.type(widthInput, '20');
+
+    expect(screen.getByLabelText(/how many pixels tall/i)).toHaveValue(9);
+  });
+
+  it('shows a Back button and calls onBack when clicked', async () => {
+    const image = makeCheckerboard(3, 3, 2, 2);
+    const onBack = vi.fn();
+    render(<GridSizeStep image={image} onGridReady={vi.fn()} onBack={onBack} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /back/i }));
+
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not show a Back button when onBack is not provided', () => {
+    const image = makeCheckerboard(3, 3, 2, 2);
+    render(<GridSizeStep image={image} onGridReady={vi.fn()} />);
+
+    expect(screen.queryByRole('button', { name: /back/i })).not.toBeInTheDocument();
+  });
+
+  it('renders a live preview that reflects the current width/height', async () => {
+    const image = makeCheckerboard(3, 3, 2, 2);
+    const renderPreview = vi.fn((grid) => `data:preview;cols=${grid[0].length};rows=${grid.length}`);
+    render(<GridSizeStep image={image} onGridReady={vi.fn()} renderPreview={renderPreview} />);
+
+    expect(screen.getByTestId('grid-preview')).toHaveAttribute('src', 'data:preview;cols=2;rows=2');
+
+    const widthInput = screen.getByLabelText(/how many pixels wide/i);
+    await userEvent.clear(widthInput);
+    await userEvent.type(widthInput, '4');
+
+    expect(screen.getByTestId('grid-preview')).toHaveAttribute('src', 'data:preview;cols=4;rows=4');
   });
 
   it('calls onGridReady with the downsampled grid when Continue is clicked', async () => {

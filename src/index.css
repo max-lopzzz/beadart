@@ -733,6 +733,12 @@ label {
   background-image: radial-gradient(var(--border) 1.5px, transparent 1.5px);
   background-size: 16px 16px;
   position: relative;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.upload-dropzone[data-drag-over='true'] {
+  border-color: var(--teal);
+  background-color: var(--surface-hover);
 }
 
 .upload-dropzone input[type='file'] {
@@ -752,10 +758,31 @@ label {
   pointer-events: none;
 }
 
+.lock-toggle {
+  align-self: center;
+}
+
 .hint {
   color: var(--ink-muted);
   font-size: var(--text-sm);
   margin: 0;
+}
+
+.grid-preview {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background-image: radial-gradient(var(--border) 1.5px, transparent 1.5px);
+  background-size: 16px 16px;
+  border-radius: var(--radius-lg);
+}
+
+.grid-preview-image {
+  max-width: 100%;
+  image-rendering: pixelated;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Palette assign */

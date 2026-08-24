@@ -78,4 +78,83 @@ describe('NewPatternWizard', () => {
       thumbnail: 'data:image/png;base64,thumb',
     });
   });
+
+  it('has no Back button on the first step, and restores prior edits when navigating back', async () => {
+    const image = makeCheckerboardImage();
+    const loadImage = vi.fn().mockResolvedValue(image);
+    const renderThumbnail = vi.fn().mockReturnValue('data:image/png;base64,thumb');
+
+    render(
+      <NewPatternWizard
+        onDone={vi.fn()}
+        onCancel={vi.fn()}
+        loadImage={loadImage}
+        renderThumbnail={renderThumbnail}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /back/i })).not.toBeInTheDocument();
+
+    const file = new File(['fake'], 'pixel-art.png', { type: 'image/png' });
+    await waitFor(() => screen.getByLabelText(/upload image/i));
+    await userEvent.upload(screen.getByLabelText(/upload image/i), file);
+
+    await waitFor(() => screen.getByRole('button', { name: /continue/i }));
+    const widthInput = screen.getByLabelText(/how many pixels wide/i);
+    await userEvent.clear(widthInput);
+    await userEvent.type(widthInput, '3');
+    await userEvent.click(screen.getByRole('button', { name: /continue/i }));
+
+    await waitFor(() => screen.getByRole('button', { name: /save pattern/i }));
+    const originalCell = document.querySelector('.assign-cell') as HTMLElement;
+    const originalColor = originalCell.getAttribute('aria-label');
+    await userEvent.click(originalCell);
+    const swatches = screen.getAllByRole('button', { name: /^swatch / });
+    const overrideSwatch = swatches.find((s) => !originalColor?.endsWith(s.getAttribute('aria-label')!.replace('swatch ', '')))!;
+    const overrideName = overrideSwatch.getAttribute('aria-label')!.replace('swatch ', '');
+    await userEvent.click(overrideSwatch);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(`cell 0-0, color ${overrideName}`)).toBeInTheDocument(),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /back/i }));
+
+    await waitFor(() => expect(screen.getByLabelText(/how many pixels wide/i)).toHaveValue(3));
+
+    await userEvent.click(screen.getByRole('button', { name: /continue/i }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(`cell 0-0, color ${overrideName}`)).toBeInTheDocument(),
+    );
+  });
+
+  it('offers to continue with the already-uploaded image when navigating all the way back to Upload', async () => {
+    const image = makeCheckerboardImage();
+    const loadImage = vi.fn().mockResolvedValue(image);
+
+    render(
+      <NewPatternWizard
+        onDone={vi.fn()}
+        onCancel={vi.fn()}
+        loadImage={loadImage}
+        renderThumbnail={vi.fn().mockReturnValue('data:image/png;base64,thumb')}
+      />,
+    );
+
+    const file = new File(['fake'], 'pixel-art.png', { type: 'image/png' });
+    await waitFor(() => screen.getByLabelText(/upload image/i));
+    await userEvent.upload(screen.getByLabelText(/upload image/i), file);
+
+    await waitFor(() => screen.getByRole('button', { name: /back/i }));
+    await userEvent.click(screen.getByRole('button', { name: /back/i }));
+
+    await waitFor(() => screen.getByLabelText(/upload image/i));
+    const continueButton = screen.getByRole('button', { name: /continue with (this|the uploaded) image/i });
+
+    await userEvent.click(continueButton);
+
+    await waitFor(() => screen.getByRole('button', { name: /continue/i }));
+    expect(loadImage).toHaveBeenCalledTimes(1);
+  });
 });

@@ -8,6 +8,12 @@ interface PaletteAssignStepProps {
   grid: RGB[][];
   palette: Palette;
   onConfirm: (cellColors: string[][]) => void;
+  onBack?: () => void;
+  initialCellColors?: string[][];
+  // Fired after every edit, not just on confirm, so a caller can keep its own
+  // copy in sync — otherwise navigating Back before confirming would silently
+  // discard whatever the user had already changed.
+  onCellColorsChange?: (cellColors: string[][]) => void;
 }
 
 interface SelectedCell {
@@ -17,9 +23,16 @@ interface SelectedCell {
 
 const CELL_SIZE_PX = 28;
 
-export function PaletteAssignStep({ grid, palette, onConfirm }: PaletteAssignStepProps) {
-  const [cellColors, setCellColors] = useState<string[][]>(() =>
-    buildCellColors(grid, palette.colors),
+export function PaletteAssignStep({
+  grid,
+  palette,
+  onConfirm,
+  onBack,
+  initialCellColors,
+  onCellColorsChange,
+}: PaletteAssignStepProps) {
+  const [cellColors, setCellColors] = useState<string[][]>(
+    () => initialCellColors ?? buildCellColors(grid, palette.colors),
   );
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
 
@@ -27,11 +40,10 @@ export function PaletteAssignStep({ grid, palette, onConfirm }: PaletteAssignSte
 
   const handleSwatchClick = (colorName: string) => {
     if (!selectedCell) return;
-    setCellColors((prev) => {
-      const next = prev.map((row) => [...row]);
-      next[selectedCell.row][selectedCell.col] = colorName;
-      return next;
-    });
+    const next = cellColors.map((row) => [...row]);
+    next[selectedCell.row][selectedCell.col] = colorName;
+    setCellColors(next);
+    onCellColorsChange?.(next);
     setSelectedCell(null);
   };
 
@@ -91,9 +103,20 @@ export function PaletteAssignStep({ grid, palette, onConfirm }: PaletteAssignSte
           ))}
         </div>
       )}
-      <button className="btn btn-primary" onClick={() => onConfirm(cellColors)}>
-        Save Pattern
-      </button>
+      {onBack ? (
+        <div className="wizard-actions">
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onBack}>
+            ← Back
+          </button>
+          <button className="btn btn-primary" onClick={() => onConfirm(cellColors)}>
+            Save Pattern
+          </button>
+        </div>
+      ) : (
+        <button className="btn btn-primary" onClick={() => onConfirm(cellColors)}>
+          Save Pattern
+        </button>
+      )}
     </div>
   );
 }

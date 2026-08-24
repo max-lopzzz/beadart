@@ -10,19 +10,22 @@ import { GridSizeStep } from './GridSizeStep';
 import { PaletteAssignStep } from './PaletteAssignStep';
 import { StepIndicator } from '../shared/StepIndicator';
 
-type WizardStep =
-  | { name: 'upload' }
-  | { name: 'grid'; image: ImageBuffer }
-  | { name: 'palette'; grid: RGB[][] }
-  | { name: 'name'; cellColors: string[][] };
+type StepName = 'upload' | 'grid' | 'palette' | 'name';
 
+const STEP_ORDER: StepName[] = ['upload', 'grid', 'palette', 'name'];
 const STEP_LABELS = ['Upload', 'Grid size', 'Palette', 'Name'];
-const STEP_INDEX: Record<WizardStep['name'], number> = {
-  upload: 0,
-  grid: 1,
-  palette: 2,
-  name: 3,
-};
+
+// Collected across steps as the user moves forward. Kept flat (rather than
+// nested inside a per-step discriminated union) so that navigating back
+// never discards what was already entered — earlier steps stay populated
+// and later ones just aren't shown yet.
+interface WizardData {
+  image: ImageBuffer | null;
+  grid: RGB[][] | null;
+  cellColors: string[][] | null;
+}
+
+const EMPTY_DATA: WizardData = { image: null, grid: null, cellColors: null };
 
 interface NewPatternWizardProps {
   onDone: (patternId: string) => void;
@@ -31,6 +34,11 @@ interface NewPatternWizardProps {
   renderThumbnail?: typeof renderPatternToDataUrl;
   now?: () => string;
   createId?: () => string;
+}
+
+function sameGridShape(a: RGB[][] | null, b: RGB[][]): boolean {
+  if (!a) return false;
+  return a.length === b.length && (a[0]?.length ?? 0) === (b[0]?.length ?? 0);
 }
 
 export function NewPatternWizard({
@@ -43,13 +51,18 @@ export function NewPatternWizard({
 }: NewPatternWizardProps) {
   const { palettes, loading: palettesLoading } = usePalettes();
   const { addPattern } = usePatterns();
-  const [step, setStep] = useState<WizardStep>({ name: 'upload' });
+  const [stepIndex, setStepIndex] = useState(0);
+  const [data, setData] = useState<WizardData>(EMPTY_DATA);
   const [patternName, setPatternName] = useState('');
+
+  const stepName = STEP_ORDER[stepIndex];
+  const goBack = () => setStepIndex((i) => Math.max(0, i - 1));
+  const onBack = stepIndex > 0 ? goBack : undefined;
 
   const shell = (children: ReactNode) => (
     <div className="container wizard-shell">
       <div className="wizard-header">
-        <StepIndicator steps={STEP_LABELS} currentIndex={STEP_INDEX[step.name]} />
+        <StepIndicator steps={STEP_LABELS} currentIndex={stepIndex} />
         <button className="btn btn-ghost btn-sm" onClick={onCancel}>
           Cancel
         </button>
@@ -58,15 +71,55 @@ export function NewPatternWizard({
     </div>
   );
 
-  if (step.name === 'upload') {
+  if (stepName === 'upload') {
     return shell(
-      <UploadStep loadImage={loadImage} onImageLoaded={(image) => setStep({ name: 'grid', image })} />,
+      <>
+        {data.image && (
+          <div className="container-narrow" style={{ padding: 0, marginBottom: 'var(--space-4)' }}>
+            <p className="hint">
+              Already uploaded an image.{' '}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setStepIndex(1)}
+              >
+                Continue with this image
+              </button>
+            </p>
+          </div>
+        )}
+        <UploadStep
+          loadImage={loadImage}
+          onImageLoaded={(image) => {
+            setData({ image, grid: null, cellColors: null });
+            setStepIndex(1);
+          }}
+        />
+      </>,
     );
   }
 
-  if (step.name === 'grid') {
+  if (stepName === 'grid') {
+    if (!data.image) return <p>No image loaded.</p>;
     return shell(
-      <GridSizeStep image={step.image} onGridReady={(grid) => setStep({ name: 'palette', grid })} />,
+      <GridSizeStep
+        image={data.image}
+        initialCols={data.grid ? data.grid[0].length : undefined}
+        initialRows={data.grid ? data.grid.length : undefined}
+        onBack={onBack}
+        onGridReady={(grid) => {
+          // Re-confirming the same grid size (e.g. the user went Back just to
+          // check, then continued without changing anything) keeps whatever
+          // palette edits were already made. A genuinely different grid
+          // shape invalidates them, since the cell count no longer matches.
+          setData((prev) => ({
+            ...prev,
+            grid,
+            cellColors: sameGridShape(prev.grid, grid) ? prev.cellColors : null,
+          }));
+          setStepIndex(2);
+        }}
+      />,
     );
   }
 
@@ -76,30 +129,37 @@ export function NewPatternWizard({
 
   const palette = palettes.find((p) => p.isBuiltIn) ?? palettes[0];
 
-  if (step.name === 'palette') {
+  if (stepName === 'palette') {
     if (!palette) {
       return <p>No palette available.</p>;
     }
+    if (!data.grid) return <p>No grid available.</p>;
     return shell(
       <PaletteAssignStep
-        grid={step.grid}
+        grid={data.grid}
         palette={palette}
-        onConfirm={(cellColors) => setStep({ name: 'name', cellColors })}
+        onBack={onBack}
+        initialCellColors={data.cellColors ?? undefined}
+        onCellColorsChange={(cellColors) => setData((prev) => ({ ...prev, cellColors }))}
+        onConfirm={(cellColors) => {
+          setData((prev) => ({ ...prev, cellColors }));
+          setStepIndex(3);
+        }}
       />,
     );
   }
 
   const handleSave = async () => {
-    if (!palette) return;
-    const rows = step.cellColors.length;
-    const cols = step.cellColors[0]?.length ?? 0;
+    if (!palette || !data.cellColors) return;
+    const rows = data.cellColors.length;
+    const cols = data.cellColors[0]?.length ?? 0;
     const pattern: Pattern = {
       id: createId(),
       name: patternName.trim() || 'Untitled Pattern',
       createdAt: now(),
       rows,
       cols,
-      cellColors: step.cellColors,
+      cellColors: data.cellColors,
       paletteId: palette.id,
       completedColors: [],
       thumbnail: '',
@@ -122,9 +182,14 @@ export function NewPatternWizard({
           autoFocus
         />
       </div>
-      <button className="btn btn-primary" onClick={handleSave}>
-        Save Pattern
-      </button>
+      <div className="wizard-actions">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={goBack}>
+          ← Back
+        </button>
+        <button className="btn btn-primary" onClick={handleSave}>
+          Save Pattern
+        </button>
+      </div>
     </div>,
   );
 }
