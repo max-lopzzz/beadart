@@ -73,13 +73,29 @@ export function NewPatternWizard({
 
   if (stepName === 'upload') {
     return shell(
-      <UploadStep
-        loadImage={loadImage}
-        onImageLoaded={(image) => {
-          setData({ image, grid: null, cellColors: null });
-          setStepIndex(1);
-        }}
-      />,
+      <>
+        {data.image && (
+          <div className="container-narrow" style={{ padding: 0, marginBottom: 'var(--space-4)' }}>
+            <p className="hint">
+              Already uploaded an image.{' '}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setStepIndex(1)}
+              >
+                Continue with this image
+              </button>
+            </p>
+          </div>
+        )}
+        <UploadStep
+          loadImage={loadImage}
+          onImageLoaded={(image) => {
+            setData({ image, grid: null, cellColors: null });
+            setStepIndex(1);
+          }}
+        />
+      </>,
     );
   }
 

@@ -39,7 +39,11 @@ export function GridSizeStep({
   // reconciliation and corrupt what the user is in the middle of typing.
   const [colsInput, setColsInput] = useState(String(initialCols ?? detectedCols ?? DEFAULT_COUNT));
   const [rowsInput, setRowsInput] = useState(String(initialRows ?? detectedRows ?? DEFAULT_COUNT));
-  const [linked, setLinked] = useState(true);
+  // Restoring explicit dimensions (e.g. after Back) means the user already
+  // chose this width/height deliberately — possibly not matching the image's
+  // own aspect ratio. Starting linked would silently overwrite one field the
+  // moment the other is touched, discarding that choice.
+  const [linked, setLinked] = useState(initialCols === undefined && initialRows === undefined);
 
   const cols = parsePositiveInt(colsInput);
   const rows = parsePositiveInt(rowsInput);

@@ -77,6 +77,24 @@ describe('GridSizeStep', () => {
     expect(screen.getByLabelText(/how many pixels tall/i)).toHaveValue(9);
   });
 
+  it('starts unlinked when restoring explicit dimensions, so editing one field does not silently overwrite a custom ratio', async () => {
+    // 12 x 9 is not the 1:1 ratio implied by this image, so it must have come
+    // from a deliberate earlier edit (e.g. the user unlinked and typed both
+    // fields by hand, or resized after Back). Defaulting linked back to true
+    // here would recompute the other field from the image's own aspect ratio
+    // the moment either field is touched, silently discarding that choice.
+    const image = makeCheckerboard(3, 3, 2, 2);
+    render(
+      <GridSizeStep image={image} onGridReady={vi.fn()} initialCols={12} initialRows={9} />,
+    );
+
+    const widthInput = screen.getByLabelText(/how many pixels wide/i);
+    await userEvent.clear(widthInput);
+    await userEvent.type(widthInput, '20');
+
+    expect(screen.getByLabelText(/how many pixels tall/i)).toHaveValue(9);
+  });
+
   it('shows a Back button and calls onBack when clicked', async () => {
     const image = makeCheckerboard(3, 3, 2, 2);
     const onBack = vi.fn();

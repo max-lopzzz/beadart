@@ -128,4 +128,33 @@ describe('NewPatternWizard', () => {
       expect(screen.getByLabelText(`cell 0-0, color ${overrideName}`)).toBeInTheDocument(),
     );
   });
+
+  it('offers to continue with the already-uploaded image when navigating all the way back to Upload', async () => {
+    const image = makeCheckerboardImage();
+    const loadImage = vi.fn().mockResolvedValue(image);
+
+    render(
+      <NewPatternWizard
+        onDone={vi.fn()}
+        onCancel={vi.fn()}
+        loadImage={loadImage}
+        renderThumbnail={vi.fn().mockReturnValue('data:image/png;base64,thumb')}
+      />,
+    );
+
+    const file = new File(['fake'], 'pixel-art.png', { type: 'image/png' });
+    await waitFor(() => screen.getByLabelText(/upload image/i));
+    await userEvent.upload(screen.getByLabelText(/upload image/i), file);
+
+    await waitFor(() => screen.getByRole('button', { name: /back/i }));
+    await userEvent.click(screen.getByRole('button', { name: /back/i }));
+
+    await waitFor(() => screen.getByLabelText(/upload image/i));
+    const continueButton = screen.getByRole('button', { name: /continue with (this|the uploaded) image/i });
+
+    await userEvent.click(continueButton);
+
+    await waitFor(() => screen.getByRole('button', { name: /continue/i }));
+    expect(loadImage).toHaveBeenCalledTimes(1);
+  });
 });

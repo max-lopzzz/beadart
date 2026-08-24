@@ -2,6 +2,11 @@ import { RGB } from '../color/lab';
 
 const CELL_SIZE_PX = 20;
 
+export function containScale(width: number, height: number, maxSize: number): number {
+  if (width <= maxSize && height <= maxSize) return 1;
+  return Math.min(maxSize / width, maxSize / height);
+}
+
 export function renderRgbGridToDataUrl(grid: RGB[][], options: { maxSize?: number } = {}): string {
   const rows = grid.length;
   const cols = rows > 0 ? grid[0].length : 0;
@@ -21,9 +26,9 @@ export function renderRgbGridToDataUrl(grid: RGB[][], options: { maxSize?: numbe
     }
   }
 
-  if (options.maxSize && canvas.width > options.maxSize) {
+  const scale = options.maxSize ? containScale(canvas.width, canvas.height, options.maxSize) : 1;
+  if (scale < 1) {
     const scaled = document.createElement('canvas');
-    const scale = options.maxSize / canvas.width;
     scaled.width = Math.round(canvas.width * scale);
     scaled.height = Math.round(canvas.height * scale);
     const scaledCtx = scaled.getContext('2d');
