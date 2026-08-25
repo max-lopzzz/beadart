@@ -3,9 +3,14 @@ import { usePatterns } from '../../hooks/usePatterns';
 import { usePalettes } from '../../hooks/usePalettes';
 import { colorCounts, completionPercent } from '../../lib/pattern/patternStats';
 import { aggregateColorTotals } from '../../lib/pattern/materialsSummary';
+import { isSharingConfigured } from '../../lib/sharing/config';
 import { Pattern } from '../../types/pattern';
 import { Palette } from '../../types/palette';
 import { ProgressRing } from '../shared/Progress';
+
+function shareUrlFor(slug: string): string {
+  return `${window.location.origin}${window.location.pathname}?share=${slug}`;
+}
 
 interface HomeScreenProps {
   onOpenPattern: (patternId: string) => void;
@@ -80,12 +85,15 @@ function sortPatterns(
 }
 
 export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: HomeScreenProps) {
-  const { patterns, loading: patternsLoading, removePattern } = usePatterns();
+  const { patterns, loading: patternsLoading, removePattern, setShare } = usePatterns();
   const { palettes, loading: palettesLoading } = usePalettes();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedMaterialColors, setSelectedMaterialColors] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>(defaultDirectionFor('date'));
+  const [sharingId, setSharingId] = useState<string | null>(null);
+  const [shareError, setShareError] = useState<{ id: string; message: string } | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   if (patternsLoading || palettesLoading) {
     return <div>Loading...</div>;
@@ -113,6 +121,41 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
       }
       return next;
     });
+  };
+
+  const handleToggleShare = async (pattern: Pattern) => {
+    const palette = palettesById.get(pattern.paletteId);
+    if (!palette) return;
+
+    setShareError(null);
+    setSharingId(pattern.id);
+    try {
+      const { publishPattern, unpublishPattern } = await import('../../lib/sharing/shareRepo');
+      if (pattern.shareSlug) {
+        await unpublishPattern(pattern.shareSlug);
+        await setShare(pattern.id, null);
+      } else {
+        const slug = crypto.randomUUID();
+        await publishPattern(slug, pattern, palette);
+        await setShare(pattern.id, slug);
+      }
+    } catch {
+      setShareError({
+        id: pattern.id,
+        message: pattern.shareSlug
+          ? 'Could not stop sharing this pattern. Try again.'
+          : "Could not share this pattern — check that sharing is set up (see README).",
+      });
+    } finally {
+      setSharingId(null);
+    }
+  };
+
+  const handleCopyShareLink = async (pattern: Pattern) => {
+    if (!pattern.shareSlug) return;
+    await navigator.clipboard.writeText(shareUrlFor(pattern.shareSlug));
+    setCopiedId(pattern.id);
+    setTimeout(() => setCopiedId((current) => (current === pattern.id ? null : current)), 2000);
   };
 
   return (
@@ -228,6 +271,32 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
                     ✕
                   </button>
                 )}
+                <div className="pattern-card-share">
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    disabled={sharingId === pattern.id || (!pattern.shareSlug && !isSharingConfigured())}
+                    onClick={() => handleToggleShare(pattern)}
+                  >
+                    {sharingId === pattern.id
+                      ? 'Working…'
+                      : pattern.shareSlug
+                        ? 'Stop sharing'
+                        : 'Share'}
+                  </button>
+                  {pattern.shareSlug && (
+                    <button className="btn btn-ghost btn-sm" onClick={() => handleCopyShareLink(pattern)}>
+                      {copiedId === pattern.id ? 'Copied!' : 'Copy link'}
+                    </button>
+                  )}
+                  {!pattern.shareSlug && !isSharingConfigured() && (
+                    <span className="hint">Set up sharing (see README) to enable this.</span>
+                  )}
+                  {shareError?.id === pattern.id && (
+                    <span className="hint" style={{ color: 'var(--danger)' }}>
+                      {shareError.message}
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}

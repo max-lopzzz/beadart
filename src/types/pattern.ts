@@ -8,4 +8,5 @@ export interface Pattern {
   paletteId: string;
   completedColors: string[];
   thumbnail: string;
+  shareSlug?: string;
 }
