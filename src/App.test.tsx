@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { resetDbForTests } from './lib/storage/db';
@@ -6,6 +6,15 @@ import { savePalette } from './lib/storage/palettesRepo';
 import { savePattern } from './lib/storage/patternsRepo';
 import { defaultPalette } from './lib/palette/defaultPalette';
 import App from './App';
+
+// SharedPatternView (lazily imported by App) pulls in the Firebase SDK,
+// which has side effects that don't play well with the fake-indexeddb
+// environment these tests share. Routing to it is exercised here; its own
+// loading/error/ready states are covered by SharedPatternView.test.tsx
+// against a mocked shareRepo.
+vi.mock('./components/shared/SharedPatternView', () => ({
+  SharedPatternView: ({ slug }: { slug: string }) => <p>Shared view for {slug}</p>,
+}));
 
 afterEach(async () => {
   resetDbForTests();
@@ -57,6 +66,18 @@ describe('App', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /new pattern/i })).toBeInTheDocument(),
     );
+  });
+
+  it('renders the shared pattern view when a ?share= slug is present', async () => {
+    window.history.pushState({}, '', '/?share=abc123');
+    try {
+      render(<App />);
+      await waitFor(() =>
+        expect(screen.getByText(/shared view for abc123/i)).toBeInTheDocument(),
+      );
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
   });
 
   it('navigates to Manage Palettes and back to Home', async () => {

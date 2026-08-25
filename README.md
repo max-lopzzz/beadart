@@ -26,10 +26,42 @@ color at a time and track your progress.
   every saved pattern, so you know what you still need.
 - **Custom palettes**: import your own bead colors from a CSV
   (`Name,Color`), alongside the built-in default palette.
+- **Progress sharing**: opt in to share a pattern and get a public link to
+  a read-only summary card (name, thumbnail, % complete, per-color
+  checklist) — handy for embedding your current work-in-progress
+  somewhere like a portfolio. Off by default, per pattern.
 
-Everything runs client-side — patterns and palettes are stored locally in
-the browser via IndexedDB. There's no backend, no accounts, and no data
-leaves your device.
+Everything else runs client-side — patterns and palettes are stored
+locally in the browser via IndexedDB. There's no backend and no accounts;
+sharing is the one opt-in feature that talks to a server (see below), and
+even then only for the specific patterns you choose to share.
+
+## Setting up sharing (optional)
+
+Sharing needs your own free [Firebase](https://firebase.google.com) project
+(Firestore):
+
+1. Create a project at [console.firebase.google.com](https://console.firebase.google.com),
+   then add a **Web app** to it (Project settings → General → Your apps) to
+   get its config values.
+2. Build → Firestore Database → Create database (any region, start in
+   production mode — the ruleset below replaces the default).
+3. In Firestore → Rules, paste in `firebase/firestore.rules` and publish.
+4. Copy `.env.example` to `.env.local` and fill in the values from step 1.
+   Only `VITE_FIREBASE_API_KEY` and `VITE_FIREBASE_PROJECT_ID` are actually
+   required for this feature; a Firebase web config's API key is meant to
+   be public — it's not a secret, access is governed by the Firestore
+   rules instead.
+5. Add the same variables in your Vercel project's Environment Variables
+   settings so sharing works in production too.
+
+Without this set up, the "Share" button on each pattern is disabled with
+a note pointing back here — everything else works as normal.
+
+Note: this app has no user accounts, so a shared pattern's link (its
+`slug`) is the only thing standing between it and anyone else — see the
+comment in `firebase/firestore.rules` for the exact trade-off. Fine for a
+personal hobby tracker; don't reuse this ruleset for anything sensitive.
 
 ## Tech stack
 

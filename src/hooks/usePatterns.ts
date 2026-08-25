@@ -11,6 +11,7 @@ import {
   savePattern,
   setCellsColor as setCellsColorInStorage,
   setColorCompleted,
+  setShareSlug,
 } from '../lib/storage/patternsRepo';
 
 interface UsePatternsOptions {
@@ -77,6 +78,14 @@ export function usePatterns({ renderThumbnail = renderPatternToDataUrl }: UsePat
     [refresh],
   );
 
+  const setShare = useCallback(
+    async (patternId: string, shareSlug: string | null) => {
+      await setShareSlug(patternId, shareSlug);
+      await refresh();
+    },
+    [refresh],
+  );
+
   const setCellsColor = useCallback(
     async (patternId: string, cells: CellPosition[], colorName: string, palette: Palette) => {
       const updated = await setCellsColorInStorage(patternId, cells, colorName);
@@ -96,5 +105,6 @@ export function usePatterns({ renderThumbnail = renderPatternToDataUrl }: UsePat
     replaceColor,
     renamePattern,
     setCellsColor,
+    setShare,
   };
 }

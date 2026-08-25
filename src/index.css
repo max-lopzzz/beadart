@@ -562,6 +562,14 @@ label {
   gap: var(--space-2);
 }
 
+.pattern-card-share {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-3);
+}
+
 .btn-danger {
   background: var(--danger);
   color: white;
@@ -1050,4 +1058,73 @@ textarea {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+.shared-view {
+  padding: var(--space-4);
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.shared-card {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.shared-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.shared-card-thumb {
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  background: var(--paper);
+  flex-shrink: 0;
+}
+
+.shared-card-heading h1 {
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-1);
+}
+
+.shared-card-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+}
+
+.shared-color-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shared-color-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.shared-color-name {
+  flex: 1;
+}
+
+.shared-color-status {
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+.shared-color-list li[data-done='true'] .shared-color-status {
+  color: var(--teal);
+  font-weight: 600;
 }

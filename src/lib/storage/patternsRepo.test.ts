@@ -9,6 +9,7 @@ import {
   replaceColorInPattern,
   renamePattern,
   setCellsColor,
+  setShareSlug,
 } from './patternsRepo';
 import { Pattern } from '../../types/pattern';
 
@@ -99,6 +100,18 @@ describe('patternsRepo', () => {
 
   it('throws when renaming a missing pattern', async () => {
     await expect(renamePattern('missing', 'New Name')).rejects.toThrow('not found');
+  });
+
+  it('sets and clears a share slug', async () => {
+    await savePattern(makePattern());
+    const shared = await setShareSlug('pattern-1', 'abc123');
+    expect(shared.shareSlug).toBe('abc123');
+    const unshared = await setShareSlug('pattern-1', null);
+    expect(unshared.shareSlug).toBeUndefined();
+  });
+
+  it('throws when setting a share slug on a missing pattern', async () => {
+    await expect(setShareSlug('missing', 'abc123')).rejects.toThrow('not found');
   });
 
   it('sets the color of a single cell without affecting others', async () => {

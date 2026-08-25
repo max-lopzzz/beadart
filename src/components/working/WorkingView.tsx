@@ -5,7 +5,19 @@ import { colorCounts, completionPercent } from '../../lib/pattern/patternStats';
 import { renderPatternToDataUrl } from '../../lib/image/renderPattern';
 import { findSimilarColors } from '../../lib/color/nearestMatch';
 import { contrastTextColor } from '../../lib/color/contrast';
+import { Pattern } from '../../types/pattern';
+import { Palette } from '../../types/palette';
 import { ProgressBar } from '../shared/Progress';
+
+function syncSharedPattern(pattern: Pattern, palette: Palette) {
+  if (!pattern.shareSlug) return;
+  import('../../lib/sharing/shareRepo')
+    .then(({ publishPattern }) => publishPattern(pattern.shareSlug!, pattern, palette))
+    .catch(() => {
+      // Sharing is a best-effort layer on top of the local-first app; a failed
+      // sync here shouldn't block the (already-saved) local edit.
+    });
+}
 
 interface WorkingViewProps {
   patternId: string;
@@ -65,8 +77,18 @@ export function WorkingView({
   };
 
   const handleRename = async () => {
-    await renamePattern(pattern.id, renameValue.trim() || pattern.name);
+    const name = renameValue.trim() || pattern.name;
+    await renamePattern(pattern.id, name);
+    syncSharedPattern({ ...pattern, name }, palette);
     setIsRenaming(false);
+  };
+
+  const handleToggleColorCompleted = async (colorName: string, completed: boolean) => {
+    await toggleColorCompleted(pattern.id, colorName, completed);
+    const completedColors = completed
+      ? [...pattern.completedColors, colorName]
+      : pattern.completedColors.filter((name) => name !== colorName);
+    syncSharedPattern({ ...pattern, completedColors }, palette);
   };
 
   const handleReplace = async (newColorName: string) => {
@@ -260,9 +282,7 @@ export function WorkingView({
                       type="checkbox"
                       aria-label={`mark ${color.name} complete`}
                       checked={pattern.completedColors.includes(color.name)}
-                      onChange={(e) =>
-                        toggleColorCompleted(pattern.id, color.name, e.target.checked)
-                      }
+                      onChange={(e) => handleToggleColorCompleted(color.name, e.target.checked)}
                     />
                     <button
                       className="legend-swatch-btn"

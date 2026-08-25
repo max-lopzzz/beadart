@@ -65,6 +65,18 @@ export async function replaceColorInPattern(
   return updated;
 }
 
+export async function setShareSlug(patternId: string, shareSlug: string | null): Promise<Pattern> {
+  const db = await getDb();
+  const pattern = await db.get('patterns', patternId);
+  if (!pattern) {
+    throw new Error(`Pattern "${patternId}" not found`);
+  }
+
+  const updated: Pattern = { ...pattern, shareSlug: shareSlug ?? undefined };
+  await db.put('patterns', updated);
+  return updated;
+}
+
 export async function renamePattern(patternId: string, name: string): Promise<Pattern> {
   const db = await getDb();
   const pattern = await db.get('patterns', patternId);
