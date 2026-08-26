@@ -258,7 +258,7 @@ label {
 }
 
 .container {
-  max-width: 960px;
+  max-width: 1800px;
   margin: 0 auto;
   padding: var(--space-6) var(--space-5);
 }

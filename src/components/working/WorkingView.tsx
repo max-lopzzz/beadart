@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePatterns } from '../../hooks/usePatterns';
 import { usePalettes } from '../../hooks/usePalettes';
 import { colorCounts, completionPercent } from '../../lib/pattern/patternStats';
@@ -48,12 +48,44 @@ export function WorkingView({
   const [renameValue, setRenameValue] = useState('');
   const [editMode, setEditMode] = useState(false);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
+  const pattern = patterns.find((p) => p.id === patternId);
+  // A state-backed callback ref (rather than a plain useRef) so the sizing
+  // effect below re-runs exactly when this element actually mounts — with
+  // patterns/palettes loading independently, the render where pattern.rows
+  // first becomes defined isn't always the same render where this div (and
+  // the working view generally, gated on palette too) first appears, so a
+  // plain ref could stay null while a rows/cols-only dependency array never
+  // changes again.
+  const [gridEl, setGridEl] = useState<HTMLDivElement | null>(null);
+  const [cellSize, setCellSize] = useState(22);
+
+  useEffect(() => {
+    if (!gridEl || !pattern) return;
+
+    const recompute = () => {
+      const rect = gridEl.getBoundingClientRect();
+      const availableWidth = gridEl.clientWidth;
+      const availableHeight = Math.max(120, window.innerHeight - rect.top - 24);
+      const size = Math.floor(
+        Math.min(availableWidth / pattern.cols, availableHeight / pattern.rows),
+      );
+      setCellSize(Math.max(6, Math.min(28, size)));
+    };
+
+    recompute();
+    const observer = new ResizeObserver(recompute);
+    observer.observe(gridEl);
+    window.addEventListener('resize', recompute);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', recompute);
+    };
+  }, [gridEl, pattern?.rows, pattern?.cols]);
 
   if (patternsLoading || palettesLoading) {
     return <div>Loading...</div>;
   }
 
-  const pattern = patterns.find((p) => p.id === patternId);
   const palette = pattern ? palettes.find((p) => p.id === pattern.paletteId) : undefined;
 
   if (!pattern || !palette) {
@@ -188,7 +220,8 @@ export function WorkingView({
               {editMode ? 'Done editing' : 'Edit cells'}
             </button>
           </div>
-          <table>
+          <div ref={setGridEl}>
+          <table style={{ margin: '0 auto' }}>
             <tbody>
               {pattern.cellColors.map((row, rowIndex) => (
                 <tr key={rowIndex}>
@@ -197,8 +230,8 @@ export function WorkingView({
                     const isSelected = selectedCells.has(`${rowIndex}-${colIndex}`);
                     const hex = hexByName.get(colorName) ?? '#000000';
                     const cellStyle = {
-                      width: 22,
-                      height: 22,
+                      width: cellSize,
+                      height: cellSize,
                       backgroundColor: dimmed ? 'var(--border)' : hex,
                       borderColor: dimmed ? undefined : contrastTextColor(hex),
                     };
@@ -232,6 +265,7 @@ export function WorkingView({
               ))}
             </tbody>
           </table>
+          </div>
           {selectedCells.size > 0 && (
             <div className="cell-edit-panel">
               <div className="legend-header">

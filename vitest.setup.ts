@@ -36,3 +36,14 @@ Object.defineProperty(window, 'localStorage', {
   value: new MemoryStorage(),
   configurable: true,
 });
+
+// jsdom doesn't implement ResizeObserver (and doesn't do real layout, so
+// there's nothing meaningful to observe anyway) — stub it out so code that
+// uses it for responsive sizing doesn't throw in tests.
+class StubResizeObserver implements ResizeObserver {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+
+window.ResizeObserver = StubResizeObserver;
