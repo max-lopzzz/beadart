@@ -233,7 +233,6 @@ export function WorkingView({
                       width: cellSize,
                       height: cellSize,
                       backgroundColor: dimmed ? 'var(--border)' : hex,
-                      borderColor: dimmed ? undefined : contrastTextColor(hex),
                     };
                     const cellLabel = `cell ${rowIndex}-${colIndex}, color ${colorName}`;
                     const cellTitle = `${colorName} — ${hex.toUpperCase()}`;
