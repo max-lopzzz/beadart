@@ -886,6 +886,13 @@ label {
   border-radius: var(--radius-md);
 }
 
+/* Separate (not collapsed) so each cell keeps its own contrast-matched
+   border instead of merging into one shared, uncontrollable line. */
+.pixel-grid-wrap table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
 .pixel-cell {
   border: 1px solid rgba(0, 0, 0, 0.08);
   transition: opacity 0.15s ease;

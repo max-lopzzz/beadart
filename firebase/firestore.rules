@@ -18,5 +18,10 @@ service cloud.firestore {
     match /sharedPatterns/{slug} {
       allow read, write: if true;
     }
+    // Same model as sharedPatterns, for the single "share everything"
+    // overview card (patterns count, beads placed, materials remaining).
+    match /sharedOverview/{slug} {
+      allow read, write: if true;
+    }
   }
 }

@@ -1,15 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePatterns } from '../../hooks/usePatterns';
 import { usePalettes } from '../../hooks/usePalettes';
 import { colorCounts, completionPercent } from '../../lib/pattern/patternStats';
 import { aggregateColorTotals } from '../../lib/pattern/materialsSummary';
 import { isSharingConfigured } from '../../lib/sharing/config';
+import { getOverviewShareSlug, setOverviewShareSlug } from '../../lib/sharing/overviewShareState';
 import { Pattern } from '../../types/pattern';
 import { Palette } from '../../types/palette';
 import { ProgressRing } from '../shared/Progress';
 
 function shareUrlFor(slug: string): string {
   return `${window.location.origin}${window.location.pathname}?share=${slug}`;
+}
+
+function overviewUrlFor(slug: string): string {
+  return `${window.location.origin}${window.location.pathname}?overview=${slug}`;
 }
 
 interface HomeScreenProps {
@@ -94,6 +99,21 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
   const [sharingId, setSharingId] = useState<string | null>(null);
   const [shareError, setShareError] = useState<{ id: string; message: string } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [overviewSlug, setOverviewSlug] = useState<string | null>(() => getOverviewShareSlug());
+  const [overviewBusy, setOverviewBusy] = useState(false);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [overviewCopied, setOverviewCopied] = useState(false);
+
+  useEffect(() => {
+    if (!overviewSlug) return;
+    const byId = new Map(palettes.map((p) => [p.id, p]));
+    import('../../lib/sharing/shareRepo')
+      .then(({ publishOverview }) => publishOverview(overviewSlug, patterns, byId))
+      .catch(() => {
+        // Best-effort, same as per-pattern syncing — the local data is
+        // already saved regardless of whether this background sync lands.
+      });
+  }, [overviewSlug, patterns, palettes]);
 
   if (patternsLoading || palettesLoading) {
     return <div>Loading...</div>;
@@ -156,6 +176,39 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
     await navigator.clipboard.writeText(shareUrlFor(pattern.shareSlug));
     setCopiedId(pattern.id);
     setTimeout(() => setCopiedId((current) => (current === pattern.id ? null : current)), 2000);
+  };
+
+  const handleToggleOverviewShare = async () => {
+    setOverviewError(null);
+    setOverviewBusy(true);
+    try {
+      const { publishOverview, unpublishOverview } = await import('../../lib/sharing/shareRepo');
+      if (overviewSlug) {
+        await unpublishOverview(overviewSlug);
+        setOverviewShareSlug(null);
+        setOverviewSlug(null);
+      } else {
+        const slug = crypto.randomUUID();
+        await publishOverview(slug, patterns, palettesById);
+        setOverviewShareSlug(slug);
+        setOverviewSlug(slug);
+      }
+    } catch {
+      setOverviewError(
+        overviewSlug
+          ? 'Could not stop sharing the overview. Try again.'
+          : "Could not share the overview — check that sharing is set up (see README).",
+      );
+    } finally {
+      setOverviewBusy(false);
+    }
+  };
+
+  const handleCopyOverviewLink = async () => {
+    if (!overviewSlug) return;
+    await navigator.clipboard.writeText(overviewUrlFor(overviewSlug));
+    setOverviewCopied(true);
+    setTimeout(() => setOverviewCopied(false), 2000);
   };
 
   return (
@@ -319,6 +372,28 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
               >
                 Show all patterns
               </button>
+            )}
+          </div>
+          <div className="pattern-card-share">
+            <button
+              className="btn btn-ghost btn-sm"
+              disabled={overviewBusy || (!overviewSlug && !isSharingConfigured())}
+              onClick={handleToggleOverviewShare}
+            >
+              {overviewBusy ? 'Working…' : overviewSlug ? 'Stop sharing overview' : 'Share overview'}
+            </button>
+            {overviewSlug && (
+              <button className="btn btn-ghost btn-sm" onClick={handleCopyOverviewLink}>
+                {overviewCopied ? 'Copied!' : 'Copy link'}
+              </button>
+            )}
+            {!overviewSlug && !isSharingConfigured() && (
+              <span className="hint">Set up sharing (see README) to enable this.</span>
+            )}
+            {overviewError && (
+              <span className="hint" style={{ color: 'var(--danger)' }}>
+                {overviewError}
+              </span>
             )}
           </div>
           <ul className="materials-list">

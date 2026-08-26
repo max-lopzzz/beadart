@@ -48,9 +48,16 @@ describe('completionPercent', () => {
     expect(completionPercent(makePattern(), palette)).toBe(0);
   });
 
-  it('returns a rounded percentage of completed distinct colors', () => {
+  it('weighs completion by bead count, not distinct color count', () => {
+    // A1 covers 2 of the pattern's 4 cells, so completing it alone is 50%,
+    // not 33% (which is what 1-of-3-distinct-colors would give).
     const pattern = makePattern({ completedColors: ['A1'] });
-    expect(completionPercent(pattern, palette)).toBe(33);
+    expect(completionPercent(pattern, palette)).toBe(50);
+  });
+
+  it('weighs a single-cell color less than a color covering most of the pattern', () => {
+    const pattern = makePattern({ completedColors: ['A2'] });
+    expect(completionPercent(pattern, palette)).toBe(25);
   });
 
   it('returns 100 when every distinct color is completed', () => {

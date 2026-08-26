@@ -195,18 +195,22 @@ export function WorkingView({
                   {row.map((colorName, colIndex) => {
                     const dimmed = activeColors.size > 0 && !activeColors.has(colorName);
                     const isSelected = selectedCells.has(`${rowIndex}-${colIndex}`);
+                    const hex = hexByName.get(colorName) ?? '#000000';
                     const cellStyle = {
                       width: 22,
                       height: 22,
-                      backgroundColor: dimmed ? 'var(--border)' : hexByName.get(colorName),
+                      backgroundColor: dimmed ? 'var(--border)' : hex,
+                      borderColor: dimmed ? undefined : contrastTextColor(hex),
                     };
                     const cellLabel = `cell ${rowIndex}-${colIndex}, color ${colorName}`;
+                    const cellTitle = `${colorName} — ${hex.toUpperCase()}`;
                     return (
                       <td key={colIndex}>
                         {editMode ? (
                           <button
                             className="pixel-cell"
                             aria-label={cellLabel}
+                            title={cellTitle}
                             data-dimmed={dimmed ? 'true' : 'false'}
                             data-selected={isSelected ? 'true' : 'false'}
                             style={cellStyle}
@@ -216,6 +220,7 @@ export function WorkingView({
                           <div
                             className="pixel-cell"
                             aria-label={cellLabel}
+                            title={cellTitle}
                             data-dimmed={dimmed ? 'true' : 'false'}
                             style={cellStyle}
                           />

@@ -7,6 +7,11 @@ import { PaletteManageScreen } from './components/palettes/PaletteManageScreen';
 const SharedPatternView = lazy(() =>
   import('./components/shared/SharedPatternView').then((m) => ({ default: m.SharedPatternView })),
 );
+const SharedOverviewView = lazy(() =>
+  import('./components/shared/SharedOverviewView').then((m) => ({
+    default: m.SharedOverviewView,
+  })),
+);
 
 type Screen =
   | { name: 'home' }
@@ -17,11 +22,20 @@ type Screen =
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' });
 
-  const shareSlug = new URLSearchParams(window.location.search).get('share');
+  const params = new URLSearchParams(window.location.search);
+  const shareSlug = params.get('share');
+  const overviewSlug = params.get('overview');
   if (shareSlug) {
     return (
       <Suspense fallback={<div className="shared-view">Loading…</div>}>
         <SharedPatternView slug={shareSlug} />
+      </Suspense>
+    );
+  }
+  if (overviewSlug) {
+    return (
+      <Suspense fallback={<div className="shared-view">Loading…</div>}>
+        <SharedOverviewView slug={overviewSlug} />
       </Suspense>
     );
   }

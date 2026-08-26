@@ -9,6 +9,7 @@ import { HomeScreen } from './HomeScreen';
 
 afterEach(async () => {
   resetDbForTests();
+  window.localStorage.removeItem('beadart.overviewShareSlug');
   await new Promise<void>((resolve, reject) => {
     const req = indexedDB.deleteDatabase('beadart');
     req.onsuccess = () => resolve();
@@ -62,6 +63,27 @@ describe('HomeScreen', () => {
 
     // colorB: 1 total, 1 left
     expect(screen.getByText(`${colorB} × 1`)).toBeInTheDocument();
+  });
+
+  it('shows the share-overview button disabled with a setup hint when sharing is not configured', async () => {
+    await savePalette(defaultPalette);
+    await savePattern({
+      id: 'pattern-1',
+      name: 'My First Pattern',
+      createdAt: '2026-08-02T00:00:00.000Z',
+      rows: 1,
+      cols: 1,
+      cellColors: [[defaultPalette.colors[0].name]],
+      paletteId: defaultPalette.id,
+      completedColors: [],
+      thumbnail: '',
+    });
+
+    render(<HomeScreen onOpenPattern={vi.fn()} onNewPattern={vi.fn()} onManagePalettes={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText(/materials overview/i)).toBeInTheDocument());
+
+    expect(screen.getByRole('button', { name: /^share overview$/i })).toBeDisabled();
+    expect(screen.getAllByText(/set up sharing \(see readme\)/i).length).toBeGreaterThan(0);
   });
 
   it('filters the pattern grid to patterns using a clicked material color', async () => {

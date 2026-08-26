@@ -3,9 +3,12 @@ import { getSharedPatternsDb } from './firebaseClient';
 import { Pattern } from '../../types/pattern';
 import { Palette } from '../../types/palette';
 import { SharedPatternSummary } from '../../types/sharedPattern';
+import { SharedOverviewSummary } from '../../types/sharedOverview';
 import { colorCounts, completionPercent } from '../pattern/patternStats';
+import { aggregateColorTotals } from '../pattern/materialsSummary';
 
 const COLLECTION = 'sharedPatterns';
+const OVERVIEW_COLLECTION = 'sharedOverview';
 
 export function buildSharedSummary(
   slug: string,
@@ -62,4 +65,48 @@ export async function fetchSharedPattern(slug: string): Promise<SharedPatternSum
     colors: data.colors,
     updatedAt: data.updatedAt,
   };
+}
+
+export function buildOverviewSummary(
+  patterns: Pattern[],
+  palettesById: Map<string, Palette>,
+): SharedOverviewSummary {
+  const materials = aggregateColorTotals(patterns, palettesById);
+  const beadsTotal = materials.reduce((sum, m) => sum + m.total, 0);
+  const beadsPlaced = beadsTotal - materials.reduce((sum, m) => sum + m.incomplete, 0);
+
+  return {
+    patternCount: patterns.length,
+    beadsPlaced,
+    beadsTotal,
+    percent: beadsTotal === 0 ? 100 : Math.round((beadsPlaced / beadsTotal) * 100),
+    materials: materials.map((m) => ({
+      name: m.name,
+      hex: m.hex,
+      total: m.total,
+      remaining: m.incomplete,
+    })),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export async function publishOverview(
+  slug: string,
+  patterns: Pattern[],
+  palettesById: Map<string, Palette>,
+): Promise<void> {
+  const summary = buildOverviewSummary(patterns, palettesById);
+  const db = getSharedPatternsDb();
+  await setDoc(doc(db, OVERVIEW_COLLECTION, slug), summary);
+}
+
+export async function unpublishOverview(slug: string): Promise<void> {
+  const db = getSharedPatternsDb();
+  await deleteDoc(doc(db, OVERVIEW_COLLECTION, slug));
+}
+
+export async function fetchSharedOverview(slug: string): Promise<SharedOverviewSummary | null> {
+  const db = getSharedPatternsDb();
+  const snapshot = await getDoc(doc(db, OVERVIEW_COLLECTION, slug));
+  return snapshot.exists() ? (snapshot.data() as SharedOverviewSummary) : null;
 }

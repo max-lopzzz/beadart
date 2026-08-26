@@ -25,12 +25,13 @@ export function colorCounts(pattern: Pattern, palette: Palette): ColorCount[] {
 }
 
 export function completionPercent(pattern: Pattern, palette: Palette): number {
-  const distinctColors = colorCounts(pattern, palette);
-  if (distinctColors.length === 0) return 100;
+  const counts = colorCounts(pattern, palette);
+  const totalBeads = counts.reduce((sum, c) => sum + c.count, 0);
+  if (totalBeads === 0) return 100;
 
-  const completed = distinctColors.filter((c) =>
-    pattern.completedColors.includes(c.name),
-  ).length;
+  const placedBeads = counts
+    .filter((c) => pattern.completedColors.includes(c.name))
+    .reduce((sum, c) => sum + c.count, 0);
 
-  return Math.round((completed / distinctColors.length) * 100);
+  return Math.round((placedBeads / totalBeads) * 100);
 }
