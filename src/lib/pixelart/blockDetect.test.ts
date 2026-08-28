@@ -66,6 +66,51 @@ function makeGridOverlayCheckerboard(
   return { width, height, data };
 }
 
+// A checkerboard sprite centered in a much larger solid-color canvas, like a
+// character exported with background padding/margin rather than cropped
+// tight to its own bounding box.
+function makePaddedSprite(
+  blockSize: number,
+  blocksX: number,
+  blocksY: number,
+  canvasWidth: number,
+  canvasHeight: number,
+): ImageBuffer {
+  const data = new Uint8ClampedArray(canvasWidth * canvasHeight * 4);
+  const bg: [number, number, number] = [0, 0, 0];
+  for (let i = 0; i < canvasWidth * canvasHeight; i++) {
+    data[i * 4] = bg[0];
+    data[i * 4 + 1] = bg[1];
+    data[i * 4 + 2] = bg[2];
+    data[i * 4 + 3] = 255;
+  }
+
+  const spriteWidth = blockSize * blocksX;
+  const spriteHeight = blockSize * blocksY;
+  const offsetX = Math.floor((canvasWidth - spriteWidth) / 2);
+  const offsetY = Math.floor((canvasHeight - spriteHeight) / 2);
+  const colorA: [number, number, number] = [255, 200, 50];
+  const colorB: [number, number, number] = [200, 60, 60];
+  for (let by = 0; by < blocksY; by++) {
+    for (let bx = 0; bx < blocksX; bx++) {
+      const color = (bx + by) % 2 === 0 ? colorA : colorB;
+      for (let y = 0; y < blockSize; y++) {
+        for (let x = 0; x < blockSize; x++) {
+          const px = offsetX + bx * blockSize + x;
+          const py = offsetY + by * blockSize + y;
+          const idx = (py * canvasWidth + px) * 4;
+          data[idx] = color[0];
+          data[idx + 1] = color[1];
+          data[idx + 2] = color[2];
+          data[idx + 3] = 255;
+        }
+      }
+    }
+  }
+
+  return { width: canvasWidth, height: canvasHeight, data };
+}
+
 function addNoise(image: ImageBuffer, amplitude: number): ImageBuffer {
   const noisy = new Uint8ClampedArray(image.data);
   for (let y = 0; y < image.height; y++) {
@@ -149,6 +194,17 @@ describe('detectBlockSize', () => {
       data[i + 3] = 255;
     }
     expect(detectBlockSize({ width, height, data })).toBeNull();
+  });
+
+  it('detects the block size of a sprite with background padding around it, not filling the whole canvas', () => {
+    // Real-world regression: a character/sprite exported with margin around
+    // it (e.g. an AI-upscaled image on a large canvas) previously failed to
+    // detect entirely, because the boundary threshold required a column's
+    // color changes to span at least half of the FULL image height/width —
+    // a bar the sprite's own content can never clear once there's enough
+    // padding, even though its grid is just as consistent within itself.
+    const image = makePaddedSprite(16, 8, 8, 400, 400);
+    expect(detectBlockSize(image)).toEqual({ blockWidth: 16, blockHeight: 16 });
   });
 
   it('falls back to the detected axis for the other when only one axis has a detectable grid', () => {
