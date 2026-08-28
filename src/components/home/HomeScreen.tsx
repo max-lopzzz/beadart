@@ -432,6 +432,14 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
         >
           ☕ Support on Ko-fi
         </a>
+        <a
+          className="btn btn-secondary btn-sm"
+          href="https://discord.com/users/605435789010141207"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          💬 Feedback on Discord
+        </a>
       </footer>
     </div>
   );
