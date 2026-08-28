@@ -1,5 +1,6 @@
 import { ImageBuffer } from './blockDetect';
 import { RGB, rgbToLab, deltaE76 } from '../color/lab';
+import { ALPHA_EMPTY_THRESHOLD } from '../../types/pattern';
 
 // Group near-duplicate border colors together before counting, so JPEG
 // compression noise or anti-aliasing along the very edge doesn't split one
@@ -21,6 +22,13 @@ export function detectBackgroundColor(image: ImageBuffer): RGB {
 
   const addPixel = (x: number, y: number) => {
     const idx = (y * image.width + x) * 4;
+    const alpha = image.data[idx + 3];
+    // A mostly-transparent pixel's RGB is often meaningless (many encoders
+    // zero the color channels under transparency) - counting it would let
+    // garbage color data outvote the border's actual (opaque) background.
+    // These pixels are already excluded from the final pattern regardless
+    // of what color gets detected here, so skipping them costs nothing.
+    if (alpha < ALPHA_EMPTY_THRESHOLD) return;
     const r = image.data[idx];
     const g = image.data[idx + 1];
     const b = image.data[idx + 2];
@@ -37,7 +45,11 @@ export function detectBackgroundColor(image: ImageBuffer): RGB {
     addPixel(x, 0);
     if (image.height > 1) addPixel(x, image.height - 1);
   }
-  for (let y = 0; y < image.height; y++) {
+  // Start after the top row and stop before the bottom row: the 4 corners
+  // were already visited above, and visiting them again here would double
+  // their weight relative to every other border pixel, letting a
+  // corner-only color outvote a genuine majority on the rest of the border.
+  for (let y = 1; y < image.height - 1; y++) {
     addPixel(0, y);
     if (image.width > 1) addPixel(image.width - 1, y);
   }

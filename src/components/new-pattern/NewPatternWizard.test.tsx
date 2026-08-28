@@ -15,6 +15,24 @@ afterEach(async () => {
   });
 });
 
+function makeSplitImage(): ImageBuffer {
+  // Left half solid white (background), right half solid red (foreground).
+  const width = 12;
+  const height = 4;
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const isBackground = x < width / 2;
+      const idx = (y * width + x) * 4;
+      data[idx] = isBackground ? 255 : 255;
+      data[idx + 1] = isBackground ? 255 : 0;
+      data[idx + 2] = isBackground ? 255 : 0;
+      data[idx + 3] = 255;
+    }
+  }
+  return { width, height, data };
+}
+
 function makeCheckerboardImage(): ImageBuffer {
   const width = 6;
   const height = 6;
@@ -158,5 +176,63 @@ describe('NewPatternWizard', () => {
 
     await waitFor(() => screen.getByRole('button', { name: /continue/i }));
     expect(loadImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies a Remove background toggle change on re-Continue, even when cols/rows are unchanged from before', async () => {
+    // Real bug: the palette-edit-preservation logic only compared grid
+    // SHAPE (rows/cols) between the old and re-confirmed grid, not its
+    // actual content - so toggling background removal without changing the
+    // dimensions was a silent no-op, since the stale cellColors (computed
+    // before the toggle) were kept unchanged.
+    const image = makeSplitImage();
+    const loadImage = vi.fn().mockResolvedValue(image);
+
+    render(
+      <NewPatternWizard
+        onDone={vi.fn()}
+        onCancel={vi.fn()}
+        loadImage={loadImage}
+        renderThumbnail={vi.fn().mockReturnValue('data:image/png;base64,thumb')}
+      />,
+    );
+
+    const file = new File(['fake'], 'pixel-art.png', { type: 'image/png' });
+    await waitFor(() => screen.getByLabelText(/upload image/i));
+    await userEvent.upload(screen.getByLabelText(/upload image/i), file);
+
+    await waitFor(() => screen.getByRole('button', { name: /continue/i }));
+    // Only the width field is touched - "Linked" is on by default, so this
+    // also sets height to 1 (round(2 * 4/12)) via the aspect-ratio
+    // calculation; separately touching the height field afterward would
+    // recalculate width right back from it and defeat the point.
+    await userEvent.clear(screen.getByLabelText(/how many pixels wide/i));
+    await userEvent.type(screen.getByLabelText(/how many pixels wide/i), '2');
+    await waitFor(() => expect(screen.getByLabelText(/how many pixels tall/i)).toHaveValue(1));
+    await userEvent.click(screen.getByRole('button', { name: /continue/i }));
+
+    // Reach the Palette step once without background removal, so the wizard
+    // caches cellColors built from the un-processed grid. Waiting on "Back"
+    // alone is ambiguous - Grid's own Back button is still in the DOM right
+    // up until this re-renders, and Palette briefly shows "Loading..." (no
+    // Back button at all) while palettes load - so wait for Palette's own
+    // heading instead.
+    await waitFor(() => screen.getByRole('heading', { name: /review pattern colors/i }));
+
+    // Edit a cell so the wizard actually caches cellColors - onConfirm/
+    // onCellColorsChange are what populate it, not merely visiting the step.
+    await userEvent.click(document.querySelector('.assign-cell') as HTMLElement);
+    const anyRealSwatch = screen
+      .getAllByRole('button', { name: /^swatch / })
+      .find((s) => s.getAttribute('aria-label') !== 'swatch Empty')!;
+    await userEvent.click(anyRealSwatch);
+
+    await userEvent.click(screen.getByRole('button', { name: /back/i }));
+    await waitFor(() => expect(screen.getByLabelText(/how many pixels wide/i)).toHaveValue(2));
+    await userEvent.click(screen.getByLabelText(/remove background/i));
+    await userEvent.click(screen.getByRole('button', { name: /continue/i }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('cell 0-0, empty (no bead)')).toBeInTheDocument(),
+    );
   });
 });

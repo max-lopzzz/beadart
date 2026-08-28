@@ -36,9 +36,25 @@ interface NewPatternWizardProps {
   createId?: () => string;
 }
 
-function sameGridShape(a: RGB[][] | null, b: RGB[][]): boolean {
+// Compares full content, not just dimensions: re-confirming the Grid step
+// with the same cols/rows can still produce a genuinely different grid (e.g.
+// toggling "Remove background" zeroes alpha on some cells without changing
+// the shape at all) - a shape-only check would silently keep stale palette
+// edits built from the old colors/alpha in that case.
+function sameGrid(a: RGB[][] | null, b: RGB[][]): boolean {
   if (!a) return false;
-  return a.length === b.length && (a[0]?.length ?? 0) === (b[0]?.length ?? 0);
+  if (a.length !== b.length) return false;
+  for (let row = 0; row < a.length; row++) {
+    if (a[row].length !== b[row].length) return false;
+    for (let col = 0; col < a[row].length; col++) {
+      const cellA = a[row][col];
+      const cellB = b[row][col];
+      if (cellA.r !== cellB.r || cellA.g !== cellB.g || cellA.b !== cellB.b || cellA.a !== cellB.a) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 export function NewPatternWizard({
@@ -108,14 +124,16 @@ export function NewPatternWizard({
         initialRows={data.grid ? data.grid.length : undefined}
         onBack={onBack}
         onGridReady={(grid) => {
-          // Re-confirming the same grid size (e.g. the user went Back just to
+          // Re-confirming an identical grid (e.g. the user went Back just to
           // check, then continued without changing anything) keeps whatever
-          // palette edits were already made. A genuinely different grid
-          // shape invalidates them, since the cell count no longer matches.
+          // palette edits were already made. Any real difference - a
+          // different cell count, or the same size with different colors/
+          // alpha (e.g. toggling "Remove background") - invalidates them,
+          // since they were built from colors that no longer match.
           setData((prev) => ({
             ...prev,
             grid,
-            cellColors: sameGridShape(prev.grid, grid) ? prev.cellColors : null,
+            cellColors: sameGrid(prev.grid, grid) ? prev.cellColors : null,
           }));
           setStepIndex(2);
         }}

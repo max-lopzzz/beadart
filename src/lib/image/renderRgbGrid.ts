@@ -1,4 +1,5 @@
 import { RGB } from '../color/lab';
+import { ALPHA_EMPTY_THRESHOLD } from '../../types/pattern';
 
 const CELL_SIZE_PX = 20;
 
@@ -21,12 +22,17 @@ export function renderRgbGridToDataUrl(grid: RGB[][], options: { maxSize?: numbe
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const { r, g, b, a } = grid[row][col];
-      // Cells with alpha are left unpainted (transparent) rather than
-      // solid-filled, so a transparent or auto-detected background shows as
-      // an actual gap in the preview - the same "no bead here" gap the
-      // final pattern will have, not a flat opaque block hiding that.
-      if (a !== undefined && a < 1) continue;
-      ctx.fillStyle = a !== undefined ? `rgba(${r}, ${g}, ${b}, ${a / 255})` : `rgb(${r}, ${g}, ${b})`;
+      // A cell below the same threshold buildCellColors uses to decide "no
+      // bead" is left unpainted (an actual gap) here too, so the preview
+      // agrees with what continuing will actually produce - previously this
+      // only skipped fully-transparent cells (a < 1), so a cell that would
+      // become empty in the real pattern (e.g. alpha 50) could preview as a
+      // faint but present color swatch instead. A kept cell always renders
+      // fully opaque, matching the solid palette color it will become -
+      // partial alpha only ever decides empty-or-not, never a translucent
+      // render.
+      if (a !== undefined && a < ALPHA_EMPTY_THRESHOLD) continue;
+      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
       ctx.fillRect(col * CELL_SIZE_PX, row * CELL_SIZE_PX, CELL_SIZE_PX, CELL_SIZE_PX);
     }
   }

@@ -6,6 +6,16 @@
 // than a color, and leave it unfilled (transparent) in exported images.
 export const EMPTY_CELL = '';
 
+// A cell/pixel is treated as "no bead" once it's more transparent than
+// opaque, rather than requiring near-full transparency - bead patterns are
+// essentially never semi-transparent art, so a cell that's mostly (but not
+// entirely) see-through is overwhelmingly more likely to be background
+// bleeding in at an edge than a genuine half-opaque design color. Shared by
+// every place that reads raw alpha (building the final pattern, the live
+// preview, background-color detection) so they all agree on what counts as
+// transparent instead of drifting apart as independent magic numbers.
+export const ALPHA_EMPTY_THRESHOLD = 128;
+
 export interface Pattern {
   id: string;
   name: string;
