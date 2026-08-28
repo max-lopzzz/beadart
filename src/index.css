@@ -667,6 +667,23 @@ label {
   white-space: nowrap;
 }
 
+.home-footer {
+  margin-top: var(--space-7);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.home-footer span {
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
