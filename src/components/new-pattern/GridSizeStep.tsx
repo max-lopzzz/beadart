@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ImageBuffer, detectBlockSize } from '../../lib/pixelart/blockDetect';
 import { downsampleToGridByCount } from '../../lib/pixelart/downsample';
+import { detectBackgroundColor, isBackgroundColor } from '../../lib/pixelart/backgroundColor';
 import { renderRgbGridToDataUrl } from '../../lib/image/renderRgbGrid';
 import { RGB } from '../../lib/color/lab';
 
@@ -44,18 +45,33 @@ export function GridSizeStep({
   // own aspect ratio. Starting linked would silently overwrite one field the
   // moment the other is touched, discarding that choice.
   const [linked, setLinked] = useState(initialCols === undefined && initialRows === undefined);
+  const [removeBackground, setRemoveBackground] = useState(false);
 
   const cols = parsePositiveInt(colsInput);
   const rows = parsePositiveInt(rowsInput);
 
-  const previewGrid = useMemo(() => downsampleToGridByCount(image, cols, rows), [image, cols, rows]);
+  const backgroundColor = useMemo(() => detectBackgroundColor(image), [image]);
+  const rawGrid = useMemo(() => downsampleToGridByCount(image, cols, rows), [image, cols, rows]);
+  // Applied after downsampling (not baked into rawGrid) so toggling doesn't
+  // require re-sampling the source image, and so a cell's real per-pixel
+  // transparency (from the source image itself, sampled by
+  // downsampleToGridByCount) is never overridden back to opaque here - this
+  // only ever adds background cells to what's already excluded, never
+  // removes an exclusion.
+  const finalGrid = useMemo(() => {
+    if (!removeBackground) return rawGrid;
+    return rawGrid.map((row) =>
+      row.map((cell) => (isBackgroundColor(cell, backgroundColor) ? { ...cell, a: 0 } : cell)),
+    );
+  }, [rawGrid, removeBackground, backgroundColor]);
+
   // Canvas rendering can be unavailable (e.g. in a test environment without a
   // 2D context) — the preview is a visual aid, not required for the step to
   // function, so a failure here degrades to no preview rather than crashing
   // the whole page.
   let previewSrc: string | null;
   try {
-    previewSrc = renderPreview(previewGrid);
+    previewSrc = renderPreview(finalGrid);
   } catch {
     previewSrc = null;
   }
@@ -75,7 +91,7 @@ export function GridSizeStep({
   };
 
   const handleContinue = () => {
-    onGridReady(previewGrid);
+    onGridReady(finalGrid);
   };
 
   return (
@@ -114,6 +130,23 @@ export function GridSizeStep({
           />
         </div>
       </div>
+      <label className="background-toggle-field" htmlFor="remove-background-toggle">
+        <input
+          id="remove-background-toggle"
+          type="checkbox"
+          checked={removeBackground}
+          onChange={(e) => setRemoveBackground(e.target.checked)}
+        />
+        Remove background
+        <span
+          data-testid="background-swatch"
+          className="bead bead-sm"
+          aria-hidden="true"
+          style={{
+            backgroundColor: `rgb(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b})`,
+          }}
+        />
+      </label>
       <p className="hint mono">
         This will create a {cols} × {rows} pattern.
       </p>

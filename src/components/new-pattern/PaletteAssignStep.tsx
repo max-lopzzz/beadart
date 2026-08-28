@@ -3,6 +3,7 @@ import { RGB } from '../../lib/color/lab';
 import { contrastTextColor } from '../../lib/color/contrast';
 import { Palette } from '../../types/palette';
 import { buildCellColors } from '../../lib/pattern/buildPattern';
+import { EMPTY_CELL } from '../../types/pattern';
 
 interface PaletteAssignStepProps {
   grid: RGB[][];
@@ -57,15 +58,20 @@ export function PaletteAssignStep({
             {cellColors.map((row, rowIndex) => (
               <tr key={rowIndex}>
                 {row.map((colorName, colIndex) => {
+                  const isEmpty = colorName === EMPTY_CELL;
                   const hex = hexByName.get(colorName) ?? '#000000';
                   const textColor = contrastTextColor(hex);
                   const isSelected =
                     selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
+                  const cellLabel = isEmpty
+                    ? `cell ${rowIndex}-${colIndex}, empty (no bead)`
+                    : `cell ${rowIndex}-${colIndex}, color ${colorName}`;
                   return (
                     <td key={colIndex}>
                       <button
                         className="assign-cell"
-                        aria-label={`cell ${rowIndex}-${colIndex}, color ${colorName}`}
+                        data-empty={isEmpty ? 'true' : 'false'}
+                        aria-label={cellLabel}
                         data-text-color={textColor}
                         data-selected={isSelected ? 'true' : 'false'}
                         onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
@@ -73,12 +79,12 @@ export function PaletteAssignStep({
                           width: CELL_SIZE_PX,
                           height: CELL_SIZE_PX,
                           padding: 0,
-                          backgroundColor: hex,
+                          backgroundColor: isEmpty ? undefined : hex,
                           color: textColor,
                           fontSize: 9,
                         }}
                       >
-                        {colorName}
+                        {isEmpty ? '' : colorName}
                       </button>
                     </td>
                   );
@@ -90,6 +96,14 @@ export function PaletteAssignStep({
       </div>
       {selectedCell && (
         <div className="swatch-picker" role="group" aria-label="Choose a replacement color">
+          <button
+            className="bead-btn bead-btn-empty"
+            aria-label="swatch Empty"
+            title="No bead"
+            onClick={() => handleSwatchClick(EMPTY_CELL)}
+          >
+            ∅
+          </button>
           {palette.colors.map((color) => (
             <button
               key={color.name}

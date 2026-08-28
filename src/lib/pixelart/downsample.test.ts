@@ -129,12 +129,12 @@ describe('downsampleToGrid', () => {
     const grid = downsampleToGrid(image, 3, 3);
     expect(grid).toEqual([
       [
-        { r: 255, g: 0, b: 0 },
-        { r: 0, g: 0, b: 255 },
+        { r: 255, g: 0, b: 0, a: 255 },
+        { r: 0, g: 0, b: 255, a: 255 },
       ],
       [
-        { r: 0, g: 0, b: 255 },
-        { r: 255, g: 0, b: 0 },
+        { r: 0, g: 0, b: 255, a: 255 },
+        { r: 255, g: 0, b: 0, a: 255 },
       ],
     ]);
   });
@@ -153,9 +153,28 @@ describe('downsampleToGrid', () => {
     // Verify all cells have the correct color (solid image averages to itself)
     for (let row = 0; row < 3; row++) {
       for (let col = 0; col < 3; col++) {
-        expect(grid[row][col]).toEqual({ r: 100, g: 150, b: 200 });
+        expect(grid[row][col]).toEqual({ r: 100, g: 150, b: 200, a: 255 });
       }
     }
+  });
+
+  it('averages alpha the same way as color channels', () => {
+    // A block that's half fully-opaque, half fully-transparent should
+    // average to a mid alpha - the same block-average treatment as r/g/b.
+    const width = 4;
+    const height = 2;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        data[idx] = 100;
+        data[idx + 1] = 100;
+        data[idx + 2] = 100;
+        data[idx + 3] = x < width / 2 ? 255 : 0;
+      }
+    }
+    const grid = downsampleToGrid({ width, height, data }, 4, 2);
+    expect(grid[0][0].a).toBe(128);
   });
 });
 
@@ -177,7 +196,7 @@ describe('downsampleToGridByCount', () => {
     const grid = downsampleToGridByCount(image, 3, 3);
     // Cell (1,1) spans x/y [3,6) - its geometric center is exactly (4,4),
     // the outlier pixel. The other 8 pixels in that cell are the true color.
-    expect(grid[1][1]).toEqual({ r: 200, g: 100, b: 50 });
+    expect(grid[1][1]).toEqual({ r: 200, g: 100, b: 50, a: 255 });
   });
 
   it('samples an interior patch of each cell, ignoring gridline-colored borders around each source block', () => {
@@ -191,12 +210,12 @@ describe('downsampleToGridByCount', () => {
     const grid = downsampleToGridByCount(image, 2, 2);
     expect(grid).toEqual([
       [
-        { r: 255, g: 0, b: 0 },
-        { r: 0, g: 0, b: 255 },
+        { r: 255, g: 0, b: 0, a: 255 },
+        { r: 0, g: 0, b: 255, a: 255 },
       ],
       [
-        { r: 0, g: 0, b: 255 },
-        { r: 255, g: 0, b: 0 },
+        { r: 0, g: 0, b: 255, a: 255 },
+        { r: 255, g: 0, b: 0, a: 255 },
       ],
     ]);
   });
@@ -206,12 +225,12 @@ describe('downsampleToGridByCount', () => {
     const grid = downsampleToGridByCount(image, 2, 2);
     expect(grid).toEqual([
       [
-        { r: 255, g: 0, b: 0 },
-        { r: 0, g: 0, b: 255 },
+        { r: 255, g: 0, b: 0, a: 255 },
+        { r: 0, g: 0, b: 255, a: 255 },
       ],
       [
-        { r: 0, g: 0, b: 255 },
-        { r: 255, g: 0, b: 0 },
+        { r: 0, g: 0, b: 255, a: 255 },
+        { r: 255, g: 0, b: 0, a: 255 },
       ],
     ]);
   });
@@ -242,12 +261,12 @@ describe('downsampleToGridByCount', () => {
     //   sorted [40,50,50,70,70,80,80,80,80] -> median (5th of 9) = 70
     expect(grid).toEqual([
       [
-        { r: 0, g: 0, b: 0 },
-        { r: 20, g: 0, b: 0 },
+        { r: 0, g: 0, b: 0, a: 255 },
+        { r: 20, g: 0, b: 0, a: 255 },
       ],
       [
-        { r: 60, g: 0, b: 0 },
-        { r: 70, g: 0, b: 0 },
+        { r: 60, g: 0, b: 0, a: 255 },
+        { r: 70, g: 0, b: 0, a: 255 },
       ],
     ]);
   });
@@ -264,8 +283,29 @@ describe('downsampleToGridByCount', () => {
     for (const row of grid) {
       expect(row.length).toBe(3);
       for (const cell of row) {
-        expect(cell).toEqual({ r: 50, g: 60, b: 70 });
+        expect(cell).toEqual({ r: 50, g: 60, b: 70, a: 255 });
       }
     }
+  });
+
+  it('samples alpha via the same interior-patch median as the color channels', () => {
+    // A fully transparent block next to fully opaque blocks: the cell over
+    // the transparent block should sample alpha near 0, not blend with its
+    // opaque neighbors.
+    const width = 6;
+    const height = 3;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        data[idx] = 200;
+        data[idx + 1] = 100;
+        data[idx + 2] = 50;
+        data[idx + 3] = x < 3 ? 0 : 255;
+      }
+    }
+    const grid = downsampleToGridByCount({ width, height, data }, 2, 1);
+    expect(grid[0][0].a).toBe(0);
+    expect(grid[0][1].a).toBe(255);
   });
 });

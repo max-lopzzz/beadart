@@ -1,4 +1,4 @@
-import { Pattern } from '../../types/pattern';
+import { EMPTY_CELL, Pattern } from '../../types/pattern';
 import { Palette } from '../../types/palette';
 
 export interface ColorCount {
@@ -15,6 +15,7 @@ export function colorCounts(pattern: Pattern, palette: Palette): ColorCount[] {
   const counts = new Map<string, number>();
   for (const row of pattern.cellColors) {
     for (const name of row) {
+      if (name === EMPTY_CELL) continue;
       counts.set(name, (counts.get(name) ?? 0) + 1);
     }
   }

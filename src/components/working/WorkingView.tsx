@@ -6,7 +6,7 @@ import { renderPatternToDataUrl } from '../../lib/image/renderPattern';
 import { findSimilarColors } from '../../lib/color/nearestMatch';
 import { contrastTextColor } from '../../lib/color/contrast';
 import { ZOOM_DEFAULT, isMajorLineStart, zoomIn, zoomOut } from '../../lib/pattern/gridDisplay';
-import { Pattern } from '../../types/pattern';
+import { EMPTY_CELL, Pattern } from '../../types/pattern';
 import { Palette } from '../../types/palette';
 import { ProgressBar } from '../shared/Progress';
 
@@ -274,16 +274,19 @@ export function WorkingView({
               {pattern.cellColors.map((row, rowIndex) => (
                 <tr key={rowIndex}>
                   {row.map((colorName, colIndex) => {
-                    const dimmed = activeColors.size > 0 && !activeColors.has(colorName);
+                    const isEmpty = colorName === EMPTY_CELL;
+                    const dimmed = !isEmpty && activeColors.size > 0 && !activeColors.has(colorName);
                     const isSelected = selectedCells.has(`${rowIndex}-${colIndex}`);
                     const hex = hexByName.get(colorName) ?? '#000000';
                     const cellStyle = {
                       width: displayCellSize,
                       height: displayCellSize,
-                      backgroundColor: dimmed ? 'var(--border)' : hex,
+                      backgroundColor: isEmpty ? undefined : dimmed ? 'var(--border)' : hex,
                     };
-                    const cellLabel = `cell ${rowIndex}-${colIndex}, color ${colorName}`;
-                    const cellTitle = `${colorName} — ${hex.toUpperCase()}`;
+                    const cellLabel = isEmpty
+                      ? `cell ${rowIndex}-${colIndex}, empty (no bead)`
+                      : `cell ${rowIndex}-${colIndex}, color ${colorName}`;
+                    const cellTitle = isEmpty ? 'No bead' : `${colorName} — ${hex.toUpperCase()}`;
                     const isMajorColStart = isMajorLineStart(colIndex, majorLineInterval);
                     const isMajorRowStart = isMajorLineStart(rowIndex, majorLineInterval);
                     return (
@@ -293,6 +296,7 @@ export function WorkingView({
                             className="pixel-cell"
                             aria-label={cellLabel}
                             title={cellTitle}
+                            data-empty={isEmpty ? 'true' : 'false'}
                             data-dimmed={dimmed ? 'true' : 'false'}
                             data-selected={isSelected ? 'true' : 'false'}
                             data-major-col-start={isMajorColStart ? 'true' : 'false'}
@@ -305,6 +309,7 @@ export function WorkingView({
                             className="pixel-cell"
                             aria-label={cellLabel}
                             title={cellTitle}
+                            data-empty={isEmpty ? 'true' : 'false'}
                             data-dimmed={dimmed ? 'true' : 'false'}
                             data-major-col-start={isMajorColStart ? 'true' : 'false'}
                             data-major-row-start={isMajorRowStart ? 'true' : 'false'}
@@ -337,6 +342,14 @@ export function WorkingView({
                 role="group"
                 aria-label="Choose a color for the selected cells"
               >
+                <button
+                  className="bead-btn bead-btn-empty"
+                  aria-label="Set selected cells to Empty"
+                  title="No bead"
+                  onClick={() => handleSetSelectedCellsColor(EMPTY_CELL)}
+                >
+                  ∅
+                </button>
                 {palette.colors.map((option) => (
                   <button
                     key={option.name}

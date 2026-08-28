@@ -358,6 +358,14 @@ label {
   transform: scale(0.95);
 }
 
+.bead-btn-empty {
+  background-image: radial-gradient(var(--border) 1.5px, transparent 1.5px);
+  background-size: 8px 8px;
+  background-color: var(--surface);
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
 /* Progress */
 
 .progress-bar-track {
@@ -787,6 +795,17 @@ label {
   align-self: center;
 }
 
+.background-toggle-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+}
+
 .hint {
   color: var(--ink-muted);
   font-size: var(--text-sm);
@@ -830,6 +849,12 @@ label {
   outline-offset: 1px;
   position: relative;
   z-index: 1;
+}
+
+.assign-cell[data-empty='true'] {
+  background-image: radial-gradient(var(--border) 1.5px, transparent 1.5px);
+  background-size: 8px 8px;
+  background-color: var(--surface);
 }
 
 .swatch-picker {
@@ -913,6 +938,12 @@ label {
   outline-offset: -2px;
   position: relative;
   z-index: 1;
+}
+
+.pixel-cell[data-empty='true'] {
+  background-image: radial-gradient(var(--border) 1.5px, transparent 1.5px);
+  background-size: 8px 8px;
+  background-color: var(--surface);
 }
 
 .pixel-cell[data-major-col-start='true'] {
