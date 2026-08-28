@@ -5,9 +5,12 @@ import { colorCounts, completionPercent } from '../../lib/pattern/patternStats';
 import { renderPatternToDataUrl } from '../../lib/image/renderPattern';
 import { findSimilarColors } from '../../lib/color/nearestMatch';
 import { contrastTextColor } from '../../lib/color/contrast';
+import { ZOOM_DEFAULT, isMajorLineStart, zoomIn, zoomOut } from '../../lib/pattern/gridDisplay';
 import { Pattern } from '../../types/pattern';
 import { Palette } from '../../types/palette';
 import { ProgressBar } from '../shared/Progress';
+
+const DEFAULT_MAJOR_LINE_INTERVAL = 10;
 
 function syncSharedPattern(pattern: Pattern, palette: Palette) {
   if (!pattern.shareSlug) return;
@@ -58,6 +61,10 @@ export function WorkingView({
   // changes again.
   const [gridEl, setGridEl] = useState<HTMLDivElement | null>(null);
   const [cellSize, setCellSize] = useState(22);
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT);
+  const [majorLineIntervalInput, setMajorLineIntervalInput] = useState(
+    String(DEFAULT_MAJOR_LINE_INTERVAL),
+  );
 
   useEffect(() => {
     if (!gridEl || !pattern) return;
@@ -95,6 +102,8 @@ export function WorkingView({
   const counts = colorCounts(pattern, palette);
   const percent = completionPercent(pattern, palette);
   const hexByName = new Map(palette.colors.map((c) => [c.name, c.hex]));
+  const majorLineInterval = Math.max(0, parseInt(majorLineIntervalInput, 10) || 0);
+  const displayCellSize = Math.round(cellSize * zoom);
 
   const toggleActiveColor = (colorName: string) => {
     setActiveColors((prev) => {
@@ -220,6 +229,45 @@ export function WorkingView({
               {editMode ? 'Done editing' : 'Edit cells'}
             </button>
           </div>
+          <div className="grid-controls">
+            <div className="grid-zoom-controls">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                aria-label="Zoom out"
+                onClick={() => setZoom((z) => zoomOut(z))}
+              >
+                −
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm mono"
+                onClick={() => setZoom(ZOOM_DEFAULT)}
+                title="Reset zoom"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                aria-label="Zoom in"
+                onClick={() => setZoom((z) => zoomIn(z))}
+              >
+                +
+              </button>
+            </div>
+            <div className="field grid-major-line-field">
+              <label htmlFor="major-line-interval-input">Major line every</label>
+              <input
+                id="major-line-interval-input"
+                type="number"
+                min={0}
+                value={majorLineIntervalInput}
+                onChange={(e) => setMajorLineIntervalInput(e.target.value)}
+              />
+              <span className="hint">cells</span>
+            </div>
+          </div>
           <div ref={setGridEl}>
           <table style={{ margin: '0 auto' }}>
             <tbody>
@@ -230,12 +278,14 @@ export function WorkingView({
                     const isSelected = selectedCells.has(`${rowIndex}-${colIndex}`);
                     const hex = hexByName.get(colorName) ?? '#000000';
                     const cellStyle = {
-                      width: cellSize,
-                      height: cellSize,
+                      width: displayCellSize,
+                      height: displayCellSize,
                       backgroundColor: dimmed ? 'var(--border)' : hex,
                     };
                     const cellLabel = `cell ${rowIndex}-${colIndex}, color ${colorName}`;
                     const cellTitle = `${colorName} — ${hex.toUpperCase()}`;
+                    const isMajorColStart = isMajorLineStart(colIndex, majorLineInterval);
+                    const isMajorRowStart = isMajorLineStart(rowIndex, majorLineInterval);
                     return (
                       <td key={colIndex}>
                         {editMode ? (
@@ -245,6 +295,8 @@ export function WorkingView({
                             title={cellTitle}
                             data-dimmed={dimmed ? 'true' : 'false'}
                             data-selected={isSelected ? 'true' : 'false'}
+                            data-major-col-start={isMajorColStart ? 'true' : 'false'}
+                            data-major-row-start={isMajorRowStart ? 'true' : 'false'}
                             style={cellStyle}
                             onClick={() => toggleCellSelection(rowIndex, colIndex)}
                           />
@@ -254,6 +306,8 @@ export function WorkingView({
                             aria-label={cellLabel}
                             title={cellTitle}
                             data-dimmed={dimmed ? 'true' : 'false'}
+                            data-major-col-start={isMajorColStart ? 'true' : 'false'}
+                            data-major-row-start={isMajorRowStart ? 'true' : 'false'}
                             style={cellStyle}
                           />
                         )}
