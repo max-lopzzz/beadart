@@ -31,19 +31,30 @@ function pixelsSimilar(a: [number, number, number], b: [number, number, number])
   );
 }
 
-function mode(values: number[]): number | null {
-  if (values.length === 0) return null;
-  const counts = new Map<number, number>();
-  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
-  let bestValue = values[0];
-  let bestCount = 0;
-  for (const [value, count] of counts) {
-    if (count > bestCount) {
-      bestValue = value;
-      bestCount = count;
-    }
+// The most common individual gap is only the true grid unit when adjacent
+// cells usually differ in color, as in an adversarial checkerboard. Real
+// pixel art is dominated by solid multi-cell regions (hair, skin, a shirt),
+// so most true-pixel-to-true-pixel boundaries produce no detectable color
+// change at all - the gaps that DO get detected are typically several grid
+// units wide (wherever the art's actual features happen to change color),
+// and their most common individual value can easily be some multiple of the
+// true unit rather than the unit itself. What every gap does still share is
+// being an (approximate) integer multiple of that unit, so the largest value
+// that evenly explains every observed gap - allowing a little slack for
+// antialiasing/blur shifting a boundary by a pixel or two - recovers it
+// correctly even when the unit itself never appears as a raw gap.
+function estimateGridUnit(gaps: number[]): number | null {
+  if (gaps.length === 0) return null;
+  const minGap = Math.min(...gaps);
+  for (let unit = minGap; unit >= 1; unit--) {
+    const tolerance = Math.min(4, Math.max(1, Math.round(unit * 0.12)));
+    const fitsAll = gaps.every((gap) => {
+      const nearestMultiple = Math.round(gap / unit) * unit;
+      return Math.abs(gap - nearestMultiple) <= tolerance;
+    });
+    if (fitsAll) return unit;
   }
-  return bestValue;
+  return null;
 }
 
 function gapsFromPositions(positions: number[]): number[] {
@@ -65,6 +76,19 @@ function gapsFromPositions(positions: number[]): number[] {
 // only one gap value (no split to find); noise produces rare, low-share
 // outliers that don't clear the "both sides meaningful" bar below. In
 // either case this returns 0, meaning no merge is needed.
+//
+// A genuine drawn/hand-photographed grid line is always just a few pixels
+// wide in absolute terms (every real example is 1-2px) - MAX_LINE_WIDTH caps
+// the merge distance to that scale. Without this cap, realistic art (large
+// solid-color regions rather than an alternating checkerboard) can produce
+// its own bimodal gap split where the SMALL, frequent value is the true grid
+// unit itself, not line-width noise - e.g. a 16px repeating unit next to a
+// handful of much larger gaps where a solid region spans multiple cells.
+// That's structurally identical to the drawn-line case (small+frequent vs
+// large+rare) but means the opposite thing, and merging it away corrupts a
+// real, meaningful spacing instead of collapsing an artifact.
+const MAX_LINE_WIDTH = 4;
+
 function findMergeDistance(gaps: number[]): number {
   const counts = new Map<number, number>();
   for (const g of gaps) counts.set(g, (counts.get(g) ?? 0) + 1);
@@ -88,7 +112,7 @@ function findMergeDistance(gaps: number[]): number {
   }
   // Require a decisive jump (3x), not a gradual size variation that could
   // just be normal noise on a single true edge spacing.
-  return bestRatio >= 3 ? bestSplitValue : 0;
+  return bestRatio >= 3 && bestSplitValue <= MAX_LINE_WIDTH ? bestSplitValue : 0;
 }
 
 function clusterBoundaries(boundaries: number[], mergeDistance: number): number[] {
@@ -104,25 +128,27 @@ function clusterBoundaries(boundaries: number[], mergeDistance: number): number[
   return clusters.map((cluster) => cluster.reduce((sum, v) => sum + v, 0) / cluster.length);
 }
 
+// The first and last gap in a boundary list span from the canvas-edge
+// sentinel (0 / image width) to the nearest REAL detected boundary. For
+// full-bleed content that's a genuine block-width measurement, but for a
+// sprite with background padding around it, it's just "however much margin
+// there is" - unrelated to the repeating grid pitch. A large one-off padding
+// gap can get misread as significant, so both the merge-distance decision
+// and the final size estimate exclude them - falling back to the full gap
+// list only when there aren't enough interior gaps to work with (e.g. a
+// grid with just 2 blocks, where the only gap IS an edge gap).
+function excludeEdgeGaps(gaps: number[]): number[] {
+  return gaps.length > 2 ? gaps.slice(1, -1) : gaps;
+}
+
 function resolveBlockSize(boundaries: number[]): number | null {
   // If no interior boundaries were found (only start and end), give up.
   if (boundaries.length <= 2) return null;
-  const gaps = gapsFromPositions(boundaries);
-  // The first and last gap span from the canvas-edge sentinel (0 / image
-  // width) to the nearest REAL detected boundary. For full-bleed content
-  // that's a genuine block-width measurement, but for a sprite with
-  // background padding around it, it's just "however much margin there is" -
-  // unrelated to the repeating grid pitch. Left in, a large one-off padding
-  // gap gets misread as "the true spacing" and the actual repeating pitch as
-  // mere line-width noise to merge away (backwards from what's real here).
-  // Excluding them only changes which gaps INFORM the merge-distance
-  // decision; the final mode() below still considers every gap, edges
-  // included, so small grids that need the edge gaps to have any interior
-  // gap at all still resolve correctly.
-  const interiorGaps = gaps.length > 2 ? gaps.slice(1, -1) : gaps;
-  const mergeDistance = findMergeDistance(interiorGaps);
+  const mergeDistance = findMergeDistance(excludeEdgeGaps(gapsFromPositions(boundaries)));
   const positions = mergeDistance > 0 ? clusterBoundaries(boundaries, mergeDistance) : boundaries;
-  return mode(gapsFromPositions(positions));
+  const finalGaps = gapsFromPositions(positions);
+  const estimateInput = excludeEdgeGaps(finalGaps);
+  return estimateGridUnit(estimateInput.length > 0 ? estimateInput : finalGaps);
 }
 
 function maxOf(values: number[]): number {
