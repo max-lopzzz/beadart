@@ -422,6 +422,17 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
           </ul>
         </div>
       )}
+      <footer className="home-footer">
+        <span>Free and open source.</span>
+        <a
+          className="btn btn-secondary btn-sm"
+          href="https://ko-fi.com/P5P61TI6BS"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          ☕ Support on Ko-fi
+        </a>
+      </footer>
     </div>
   );
 }
