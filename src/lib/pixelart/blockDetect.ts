@@ -107,9 +107,28 @@ function clusterBoundaries(boundaries: number[], mergeDistance: number): number[
 function resolveBlockSize(boundaries: number[]): number | null {
   // If no interior boundaries were found (only start and end), give up.
   if (boundaries.length <= 2) return null;
-  const mergeDistance = findMergeDistance(gapsFromPositions(boundaries));
+  const gaps = gapsFromPositions(boundaries);
+  // The first and last gap span from the canvas-edge sentinel (0 / image
+  // width) to the nearest REAL detected boundary. For full-bleed content
+  // that's a genuine block-width measurement, but for a sprite with
+  // background padding around it, it's just "however much margin there is" -
+  // unrelated to the repeating grid pitch. Left in, a large one-off padding
+  // gap gets misread as "the true spacing" and the actual repeating pitch as
+  // mere line-width noise to merge away (backwards from what's real here).
+  // Excluding them only changes which gaps INFORM the merge-distance
+  // decision; the final mode() below still considers every gap, edges
+  // included, so small grids that need the edge gaps to have any interior
+  // gap at all still resolve correctly.
+  const interiorGaps = gaps.length > 2 ? gaps.slice(1, -1) : gaps;
+  const mergeDistance = findMergeDistance(interiorGaps);
   const positions = mergeDistance > 0 ? clusterBoundaries(boundaries, mergeDistance) : boundaries;
   return mode(gapsFromPositions(positions));
+}
+
+function maxOf(values: number[]): number {
+  let max = 0;
+  for (const v of values) if (v > max) max = v;
+  return max;
 }
 
 function detectBlockWidth(image: ImageBuffer): number | null {
@@ -121,7 +140,16 @@ function detectBlockWidth(image: ImageBuffer): number | null {
       }
     }
   }
-  const threshold = image.height * 0.5;
+  // Threshold relative to the strongest column's vote count, not the image's
+  // full height: a sprite with background padding/margin around it (very
+  // common for exported or AI-generated art) never has any column's changes
+  // span half of the WHOLE canvas, even though they're just as consistent
+  // across the sprite's own rows. A genuinely flat image (no edges anywhere)
+  // has a max of 0, which would make every column pass an ">= 0" threshold,
+  // so that case is guarded separately.
+  const maxChangeCount = maxOf(changeCounts);
+  if (maxChangeCount === 0) return null;
+  const threshold = maxChangeCount * 0.5;
   const boundaries = [0];
   for (let x = 1; x < image.width; x++) {
     if (changeCounts[x] >= threshold) boundaries.push(x);
@@ -139,7 +167,9 @@ function detectBlockHeight(image: ImageBuffer): number | null {
       }
     }
   }
-  const threshold = image.width * 0.5;
+  const maxChangeCount = maxOf(changeCounts);
+  if (maxChangeCount === 0) return null;
+  const threshold = maxChangeCount * 0.5;
   const boundaries = [0];
   for (let y = 1; y < image.height; y++) {
     if (changeCounts[y] >= threshold) boundaries.push(y);
