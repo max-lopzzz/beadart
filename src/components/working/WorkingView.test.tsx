@@ -227,6 +227,63 @@ describe('WorkingView', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('zooms the grid in and out via the zoom controls, and resets to fit', async () => {
+    await savePalette(palette);
+    await savePattern(pattern);
+    render(<WorkingView patternId="pattern-1" onBack={vi.fn()} />);
+
+    await waitFor(() => screen.getByLabelText('cell 0-0, color Red'));
+    const cell = screen.getByLabelText('cell 0-0, color Red');
+    const initialWidth = cell.style.width;
+
+    await userEvent.click(screen.getByRole('button', { name: /zoom in/i }));
+    expect(screen.getByText('125%')).toBeInTheDocument();
+    expect(cell.style.width).not.toBe(initialWidth);
+
+    await userEvent.click(screen.getByRole('button', { name: /zoom out/i }));
+    expect(screen.getByText('100%')).toBeInTheDocument();
+    expect(cell.style.width).toBe(initialWidth);
+  });
+
+  it('marks every Nth row and column with a major gridline, based on the configured interval', async () => {
+    await savePalette(palette);
+    await savePattern({
+      ...pattern,
+      id: 'pattern-5',
+      rows: 3,
+      cols: 3,
+      cellColors: [
+        ['Red', 'Blue', 'Red'],
+        ['Blue', 'Red', 'Blue'],
+        ['Red', 'Blue', 'Red'],
+      ],
+    });
+    render(<WorkingView patternId="pattern-5" onBack={vi.fn()} />);
+
+    await waitFor(() => screen.getByLabelText('cell 0-0, color Red'));
+
+    const intervalInput = screen.getByLabelText(/major line every/i);
+    await userEvent.clear(intervalInput);
+    await userEvent.type(intervalInput, '2');
+
+    expect(screen.getByLabelText('cell 0-2, color Red')).toHaveAttribute(
+      'data-major-col-start',
+      'true',
+    );
+    expect(screen.getByLabelText('cell 2-0, color Red')).toHaveAttribute(
+      'data-major-row-start',
+      'true',
+    );
+    expect(screen.getByLabelText('cell 0-0, color Red')).toHaveAttribute(
+      'data-major-col-start',
+      'false',
+    );
+    expect(screen.getByLabelText('cell 0-1, color Blue')).toHaveAttribute(
+      'data-major-col-start',
+      'false',
+    );
+  });
+
   it('calls renderExport with the active color filter when Export is clicked', async () => {
     await savePalette(palette);
     await savePattern(pattern);
