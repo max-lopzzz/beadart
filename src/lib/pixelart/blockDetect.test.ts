@@ -111,6 +111,50 @@ function makePaddedSprite(
   return { width: canvasWidth, height: canvasHeight, data };
 }
 
+// Reproduces the EXACT color-change boundary pattern measured from a real
+// reported image (a 1408x832 AI-generated character sprite where detection
+// returned garbage on the width axis) - a checkerboard of "runs" along each
+// axis rather than a redrawing of the source art, but structurally
+// identical in the one property the algorithm actually looks at: where the
+// color transitions fall, and how far apart they are. widthGaps/heightGaps
+// are the exact consecutive gap sequences measured on the real file.
+function makeRunCheckerboard(widthGaps: number[], heightGaps: number[]): ImageBuffer {
+  const boundsFromGaps = (gaps: number[]): number[] => {
+    const bounds = [0];
+    for (const g of gaps) bounds.push(bounds[bounds.length - 1] + g);
+    return bounds;
+  };
+  const widthBounds = boundsFromGaps(widthGaps);
+  const heightBounds = boundsFromGaps(heightGaps);
+  const width = widthBounds[widthBounds.length - 1];
+  const height = heightBounds[heightBounds.length - 1];
+
+  const runIndex = (pos: number, bounds: number[]): number => {
+    for (let i = 0; i < bounds.length - 1; i++) {
+      if (pos >= bounds[i] && pos < bounds[i + 1]) return i;
+    }
+    return bounds.length - 2;
+  };
+
+  const colorA: [number, number, number] = [255, 255, 255];
+  const colorB: [number, number, number] = [80, 140, 90];
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    const j = runIndex(y, heightBounds);
+    for (let x = 0; x < width; x++) {
+      const i = runIndex(x, widthBounds);
+      const color = (i + j) % 2 === 0 ? colorA : colorB;
+      const idx = (y * width + x) * 4;
+      data[idx] = color[0];
+      data[idx + 1] = color[1];
+      data[idx + 2] = color[2];
+      data[idx + 3] = 255;
+    }
+  }
+
+  return { width, height, data };
+}
+
 function addNoise(image: ImageBuffer, amplitude: number): ImageBuffer {
   const noisy = new Uint8ClampedArray(image.data);
   for (let y = 0; y < image.height; y++) {
@@ -204,6 +248,27 @@ describe('detectBlockSize', () => {
     // a bar the sprite's own content can never clear once there's enough
     // padding, even though its grid is just as consistent within itself.
     const image = makePaddedSprite(16, 8, 8, 400, 400);
+    expect(detectBlockSize(image)).toEqual({ blockWidth: 16, blockHeight: 16 });
+  });
+
+  it('detects the true 16px unit from a real reported image whose detected gaps are mostly multiples of it, not the unit itself', () => {
+    // Real bug report: an 88x52 (true pixels) AI-generated character sprite
+    // at 16x scale (1408x832) detected as garbage on the width axis. Most
+    // true-pixel-to-true-pixel boundaries in art like this produce no color
+    // change at all (large solid hair/face/shirt regions), so most detected
+    // gaps are MULTIPLES of the true block size rather than the size itself
+    // - a naive "most common gap" (mode) picks one of those multiples
+    // instead. Worse, the merge-distance heuristic (built for a THIN drawn
+    // grid-overlay line, always a few px wide in every other fixture here)
+    // misread the true 16px unit itself as "line width to merge away" when
+    // it showed up as the smallest frequent gap, corrupting the result
+    // entirely (down to a nonsensical value larger than the image itself).
+    // These are the exact color-change gap sequences measured on the real
+    // file, on each axis independently.
+    const image = makeRunCheckerboard(
+      [528, 16, 128, 16, 80, 64, 576],
+      [208, 112, 32, 16, 128, 48, 16, 128, 48, 96],
+    );
     expect(detectBlockSize(image)).toEqual({ blockWidth: 16, blockHeight: 16 });
   });
 
