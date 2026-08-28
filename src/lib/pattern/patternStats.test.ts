@@ -41,6 +41,19 @@ describe('colorCounts', () => {
       { name: 'A3', hex: '#0000ff', count: 1 },
     ]);
   });
+
+  it('excludes empty (no-bead) cells from the count', () => {
+    const pattern = makePattern({
+      cellColors: [
+        ['A1', ''],
+        ['', 'A3'],
+      ],
+    });
+    expect(colorCounts(pattern, palette)).toEqual([
+      { name: 'A1', hex: '#ff0000', count: 1 },
+      { name: 'A3', hex: '#0000ff', count: 1 },
+    ]);
+  });
 });
 
 describe('completionPercent', () => {
@@ -62,6 +75,19 @@ describe('completionPercent', () => {
 
   it('returns 100 when every distinct color is completed', () => {
     const pattern = makePattern({ completedColors: ['A1', 'A2', 'A3'] });
+    expect(completionPercent(pattern, palette)).toBe(100);
+  });
+
+  it('ignores empty (no-bead) cells when weighing completion, not just when counting colors', () => {
+    // 2 real beads (A1) out of 3 cells total, 1 of which is empty - percent
+    // should be based on the 2 real beads, not the cell grid's raw size.
+    const pattern = makePattern({
+      cellColors: [
+        ['A1', 'A1'],
+        ['', ''],
+      ],
+      completedColors: ['A1'],
+    });
     expect(completionPercent(pattern, palette)).toBe(100);
   });
 });

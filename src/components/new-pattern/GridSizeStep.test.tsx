@@ -26,6 +26,30 @@ function makeCheckerboard(blockWidth: number, blockHeight: number, blocksX: numb
   return { width, height, data };
 }
 
+// Left half solid background, right half a distinct foreground color - the
+// border (which detectBackgroundColor samples) is dominated by the
+// background color, so downsampling to a 2x1 grid gives one cell squarely
+// in each region.
+function makeSplitImage(
+  backgroundColor: [number, number, number],
+  foregroundColor: [number, number, number],
+): ImageBuffer {
+  const width = 8;
+  const height = 4;
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const color = x < width / 2 ? backgroundColor : foregroundColor;
+      const idx = (y * width + x) * 4;
+      data[idx] = color[0];
+      data[idx + 1] = color[1];
+      data[idx + 2] = color[2];
+      data[idx + 3] = 255;
+    }
+  }
+  return { width, height, data };
+}
+
 describe('GridSizeStep', () => {
   it('pre-fills the detected pixel dimensions and shows the resulting grid size', () => {
     const image = makeCheckerboard(3, 3, 2, 2);
@@ -126,6 +150,42 @@ describe('GridSizeStep', () => {
     expect(screen.getByTestId('grid-preview')).toHaveAttribute('src', 'data:preview;cols=4;rows=4');
   });
 
+  it('shows a Remove background toggle, off by default, with the auto-detected color as a swatch', () => {
+    const image = makeSplitImage([255, 255, 255], [200, 60, 60]);
+    render(<GridSizeStep image={image} onGridReady={vi.fn()} />);
+
+    const toggle = screen.getByLabelText(/remove background/i);
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByTestId('background-swatch')).toHaveStyle({
+      backgroundColor: 'rgb(255, 255, 255)',
+    });
+  });
+
+  it('does not alter the grid when the Remove background toggle is off', async () => {
+    const image = makeSplitImage([255, 255, 255], [200, 60, 60]);
+    const onGridReady = vi.fn();
+    render(<GridSizeStep image={image} onGridReady={onGridReady} initialCols={2} initialRows={1} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /continue/i }));
+
+    const grid = onGridReady.mock.calls[0][0];
+    expect(grid[0][0].a).toBe(255);
+    expect(grid[0][1].a).toBe(255);
+  });
+
+  it('zeroes alpha on cells matching the detected background color when the toggle is on, leaving foreground cells untouched', async () => {
+    const image = makeSplitImage([255, 255, 255], [200, 60, 60]);
+    const onGridReady = vi.fn();
+    render(<GridSizeStep image={image} onGridReady={onGridReady} initialCols={2} initialRows={1} />);
+
+    await userEvent.click(screen.getByLabelText(/remove background/i));
+    await userEvent.click(screen.getByRole('button', { name: /continue/i }));
+
+    const grid = onGridReady.mock.calls[0][0];
+    expect(grid[0][0].a).toBe(0);
+    expect(grid[0][1].a).toBe(255);
+  });
+
   it('calls onGridReady with the downsampled grid when Continue is clicked', async () => {
     const image = makeCheckerboard(3, 3, 2, 2);
     const onGridReady = vi.fn();
@@ -137,12 +197,12 @@ describe('GridSizeStep', () => {
     const grid = onGridReady.mock.calls[0][0];
     expect(grid).toEqual([
       [
-        { r: 255, g: 0, b: 0 },
-        { r: 0, g: 0, b: 255 },
+        { r: 255, g: 0, b: 0, a: 255 },
+        { r: 0, g: 0, b: 255, a: 255 },
       ],
       [
-        { r: 0, g: 0, b: 255 },
-        { r: 255, g: 0, b: 0 },
+        { r: 0, g: 0, b: 255, a: 255 },
+        { r: 255, g: 0, b: 0, a: 255 },
       ],
     ]);
   });

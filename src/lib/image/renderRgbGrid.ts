@@ -20,8 +20,13 @@ export function renderRgbGridToDataUrl(grid: RGB[][], options: { maxSize?: numbe
 
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      const { r, g, b } = grid[row][col];
-      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+      const { r, g, b, a } = grid[row][col];
+      // Cells with alpha are left unpainted (transparent) rather than
+      // solid-filled, so a transparent or auto-detected background shows as
+      // an actual gap in the preview - the same "no bead here" gap the
+      // final pattern will have, not a flat opaque block hiding that.
+      if (a !== undefined && a < 1) continue;
+      ctx.fillStyle = a !== undefined ? `rgba(${r}, ${g}, ${b}, ${a / 255})` : `rgb(${r}, ${g}, ${b})`;
       ctx.fillRect(col * CELL_SIZE_PX, row * CELL_SIZE_PX, CELL_SIZE_PX, CELL_SIZE_PX);
     }
   }

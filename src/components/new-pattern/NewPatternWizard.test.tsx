@@ -109,7 +109,9 @@ describe('NewPatternWizard', () => {
     const originalCell = document.querySelector('.assign-cell') as HTMLElement;
     const originalColor = originalCell.getAttribute('aria-label');
     await userEvent.click(originalCell);
-    const swatches = screen.getAllByRole('button', { name: /^swatch / });
+    const swatches = screen
+      .getAllByRole('button', { name: /^swatch / })
+      .filter((s) => s.getAttribute('aria-label') !== 'swatch Empty');
     const overrideSwatch = swatches.find((s) => !originalColor?.endsWith(s.getAttribute('aria-label')!.replace('swatch ', '')))!;
     const overrideName = overrideSwatch.getAttribute('aria-label')!.replace('swatch ', '');
     await userEvent.click(overrideSwatch);

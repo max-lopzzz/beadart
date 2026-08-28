@@ -2,6 +2,10 @@ export interface RGB {
   r: number;
   g: number;
   b: number;
+  // Alpha (0-255), not the Lab color space's "a" axis below. Optional: most
+  // RGB values in this codebase come from fully-opaque palette hex codes,
+  // where alpha is meaningless and simply omitted.
+  a?: number;
 }
 
 export interface Lab {

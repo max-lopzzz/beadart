@@ -284,6 +284,39 @@ describe('WorkingView', () => {
     );
   });
 
+  it('renders an empty (no-bead) cell distinctly, and excludes it from the color list', async () => {
+    await savePalette(palette);
+    await savePattern({ ...pattern, id: 'pattern-6', cellColors: [['Red', '']] });
+    render(<WorkingView patternId="pattern-6" onBack={vi.fn()} />);
+
+    await waitFor(() => screen.getByLabelText('cell 0-0, color Red'));
+    expect(screen.getByLabelText('cell 0-1, empty (no bead)')).toBeInTheDocument();
+    expect(screen.queryByText(/^ ×/)).not.toBeInTheDocument();
+    expect(screen.getByText('Red × 1')).toBeInTheDocument();
+  });
+
+  it('lets an empty cell be filled in with a real color via edit mode, and a colored cell be cleared to empty', async () => {
+    await savePalette(palette);
+    await savePattern({ ...pattern, id: 'pattern-7', cellColors: [['Red', '']] });
+    const renderThumbnail = vi.fn().mockReturnValue('data:image/png;base64,thumb');
+    render(<WorkingView patternId="pattern-7" onBack={vi.fn()} renderThumbnail={renderThumbnail} />);
+
+    await waitFor(() => screen.getByLabelText('cell 0-0, color Red'));
+    await userEvent.click(screen.getByRole('button', { name: /edit cells/i }));
+
+    await userEvent.click(screen.getByLabelText('cell 0-1, empty (no bead)'));
+    await userEvent.click(screen.getByRole('button', { name: /set selected cells to blue/i }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('cell 0-1, color Blue')).toBeInTheDocument(),
+    );
+
+    await userEvent.click(screen.getByLabelText('cell 0-0, color Red'));
+    await userEvent.click(screen.getByRole('button', { name: /set selected cells to empty/i }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('cell 0-0, empty (no bead)')).toBeInTheDocument(),
+    );
+  });
+
   it('calls renderExport with the active color filter when Export is clicked', async () => {
     await savePalette(palette);
     await savePattern(pattern);

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { PaletteAssignStep } from './PaletteAssignStep';
 import { Palette } from '../../types/palette';
 import { RGB } from '../../lib/color/lab';
+import { EMPTY_CELL } from '../../types/pattern';
 
 describe('PaletteAssignStep', () => {
   const palette: Palette = {
@@ -96,6 +97,48 @@ describe('PaletteAssignStep', () => {
     render(<PaletteAssignStep grid={grid} palette={palette} onConfirm={vi.fn()} />);
 
     expect(screen.queryByRole('button', { name: /back/i })).not.toBeInTheDocument();
+  });
+
+  it('renders a transparent cell as empty (no bead), not matched to a palette color', () => {
+    const gridWithTransparentCell: RGB[][] = [
+      [
+        { r: 250, g: 5, b: 5, a: 255 },
+        { r: 5, g: 5, b: 250, a: 0 },
+      ],
+    ];
+    render(<PaletteAssignStep grid={gridWithTransparentCell} palette={palette} onConfirm={vi.fn()} />);
+
+    const emptyCell = screen.getByLabelText('cell 0-1, empty (no bead)');
+    expect(emptyCell).toBeInTheDocument();
+    expect(emptyCell).toHaveTextContent('');
+  });
+
+  it('offers an Empty swatch that clears a cell to no bead, and confirms it as such', async () => {
+    const onConfirm = vi.fn();
+    render(<PaletteAssignStep grid={grid} palette={palette} onConfirm={onConfirm} />);
+
+    await userEvent.click(screen.getByLabelText('cell 0-0, color Red'));
+    await userEvent.click(screen.getByLabelText('swatch Empty'));
+    await userEvent.click(screen.getByRole('button', { name: /save pattern/i }));
+
+    expect(onConfirm).toHaveBeenCalledWith([[EMPTY_CELL, 'Blue']]);
+  });
+
+  it('lets a previously-empty cell be filled back in with a real color', async () => {
+    const gridWithTransparentCell: RGB[][] = [
+      [
+        { r: 250, g: 5, b: 5, a: 255 },
+        { r: 5, g: 5, b: 250, a: 0 },
+      ],
+    ];
+    const onConfirm = vi.fn();
+    render(<PaletteAssignStep grid={gridWithTransparentCell} palette={palette} onConfirm={onConfirm} />);
+
+    await userEvent.click(screen.getByLabelText('cell 0-1, empty (no bead)'));
+    await userEvent.click(screen.getByLabelText('swatch Blue'));
+    await userEvent.click(screen.getByRole('button', { name: /save pattern/i }));
+
+    expect(onConfirm).toHaveBeenCalledWith([['Red', 'Blue']]);
   });
 
   it('uses dark text on a light background and light text on a dark background', () => {

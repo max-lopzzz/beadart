@@ -21,6 +21,7 @@ export function downsampleToGrid(
       let sumR = 0;
       let sumG = 0;
       let sumB = 0;
+      let sumA = 0;
       let count = 0;
       for (let y = startY; y < endY; y++) {
         for (let x = startX; x < endX; x++) {
@@ -28,6 +29,7 @@ export function downsampleToGrid(
           sumR += image.data[idx];
           sumG += image.data[idx + 1];
           sumB += image.data[idx + 2];
+          sumA += image.data[idx + 3];
           count++;
         }
       }
@@ -36,6 +38,7 @@ export function downsampleToGrid(
         r: Math.round(sumR / count),
         g: Math.round(sumG / count),
         b: Math.round(sumB / count),
+        a: Math.round(sumA / count),
       });
     }
     grid.push(rowColors);
@@ -93,12 +96,14 @@ export function downsampleToGridByCount(image: ImageBuffer, cols: number, rows: 
       const rValues: number[] = [];
       const gValues: number[] = [];
       const bValues: number[] = [];
+      const aValues: number[] = [];
       for (let y = patchStartY; y < patchEndY; y++) {
         for (let x = patchStartX; x < patchEndX; x++) {
           const idx = (y * image.width + x) * 4;
           rValues.push(image.data[idx]);
           gValues.push(image.data[idx + 1]);
           bValues.push(image.data[idx + 2]);
+          aValues.push(image.data[idx + 3]);
         }
       }
 
@@ -106,6 +111,7 @@ export function downsampleToGridByCount(image: ImageBuffer, cols: number, rows: 
         r: median(rValues),
         g: median(gValues),
         b: median(bValues),
+        a: median(aValues),
       });
     }
     grid.push(rowColors);
