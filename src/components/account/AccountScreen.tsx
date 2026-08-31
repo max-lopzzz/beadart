@@ -1,9 +1,10 @@
 import { FormEvent, useState } from 'react';
 
-import { SyncStatus, useAccount } from '../../hooks/useAccount';
+import type { AccountState, SyncStatus } from '../../hooks/useAccount';
 
 interface AccountScreenProps {
   onBack: () => void;
+  account: AccountState;
 }
 
 const SYNC_STATUS_LABEL: Record<SyncStatus, string> = {
@@ -26,7 +27,10 @@ function SyncBadge({ status }: { status: SyncStatus }) {
   );
 }
 
-export function AccountScreen({ onBack }: AccountScreenProps) {
+export function AccountScreen({
+  onBack,
+  account,
+}: AccountScreenProps) {
   const {
     user,
     loading,
@@ -35,7 +39,7 @@ export function AccountScreen({ onBack }: AccountScreenProps) {
     register,
     login,
     logout,
-  } = useAccount();
+  } = account;
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');

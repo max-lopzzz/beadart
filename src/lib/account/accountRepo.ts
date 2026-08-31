@@ -308,6 +308,9 @@ export async function syncLocalDataWithAccount(): Promise<void> {
   }
 
   await Promise.all([...patternWrites, ...paletteWrites]);
+  
+  window.dispatchEvent(new Event('beadart-patterns-updated'));
+  window.dispatchEvent(new Event('beadart-palettes-updated'));
 }
 
 /**

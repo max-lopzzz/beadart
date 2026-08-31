@@ -7,6 +7,18 @@ import { savePattern } from './lib/storage/patternsRepo';
 import { defaultPalette } from './lib/palette/defaultPalette';
 import App from './App';
 
+vi.mock('./hooks/useAccount', () => ({
+  useAccount: () => ({
+    user: null,
+    loading: false,
+    isAuthenticated: false,
+    syncStatus: 'offline',
+    register: vi.fn(),
+    login: vi.fn(),
+    logout: vi.fn(),
+  }),
+}));
+
 // SharedPatternView (lazily imported by App) pulls in the Firebase SDK,
 // which has side effects that don't play well with the fake-indexeddb
 // environment these tests share. Routing to it is exercised here; its own

@@ -1,0 +1,544 @@
+From 8d5fad10b5aa4f46490cc14dadf752eed7cb38ee Mon Sep 17 00:00:00 2001
+From: Maximiliano <m.lopz.montn@gmail.com>
+Date: Mon, 31 Aug 2026 19:28:24 +0000
+Subject: [PATCH 2/2] feat: restyle the account screen with the app's design
+ system
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+AccountScreen was plain unstyled markup (no classes at all beyond a
+bare .container), the odd one out next to every other screen in the
+app. Rebuild it using the existing tokens/components instead:
+
+- .container-narrow + .surface card, matching PaletteManageScreen
+- a real segmented control for Sign in / Create account instead of
+  two loose buttons
+- .btn-primary / .btn-secondary / .btn-ghost throughout, labels
+  properly associated to inputs via htmlFor/id
+- a consistent "← Back" btn-ghost in the corner, same as the other
+  sub-screens
+
+Also add a small sync-status badge (live/connecting/error) once
+signed in, driven by useAccount's new syncStatus, so a broken
+real-time connection is visible instead of silent. New CSS lives
+under a dedicated 'Account screen' section at the end of index.css.
+
+Fix the 'Account' button in HomeScreen's header, which had no btn
+class and looked out of place next to 'Manage Palettes' / '+ New
+Pattern'.
+
+All existing AccountScreen tests still pass unmodified assertions
+(same copy, same aria-labels, same roles); added cases for the new
+sync badge states.
+---
+ src/components/account/AccountScreen.test.tsx |  60 +++++
+ src/components/account/AccountScreen.tsx      | 219 +++++++++++-------
+ src/components/home/HomeScreen.tsx            |   2 +-
+ src/index.css                                 |  94 ++++++++
+ 4 files changed, 287 insertions(+), 88 deletions(-)
+
+diff --git a/src/components/account/AccountScreen.test.tsx b/src/components/account/AccountScreen.test.tsx
+index c538363..52af97b 100644
+--- a/src/components/account/AccountScreen.test.tsx
++++ b/src/components/account/AccountScreen.test.tsx
+@@ -10,6 +10,7 @@ import {
+ import userEvent from '@testing-library/user-event';
+ 
+ import { AccountScreen } from './AccountScreen';
++import type { SyncStatus } from '../../hooks/useAccount';
+ 
+ type MockUser = {
+   uid: string;
+@@ -20,6 +21,7 @@ const mockAccount: {
+   user: MockUser | null;
+   loading: boolean;
+   isAuthenticated: boolean;
++  syncStatus: SyncStatus;
+   register: ReturnType<typeof vi.fn>;
+   login: ReturnType<typeof vi.fn>;
+   logout: ReturnType<typeof vi.fn>;
+@@ -27,6 +29,7 @@ const mockAccount: {
+   user: null,
+   loading: false,
+   isAuthenticated: false,
++  syncStatus: 'offline',
+   register: vi.fn(),
+   login: vi.fn(),
+   logout: vi.fn(),
+@@ -42,6 +45,7 @@ afterEach(() => {
+   mockAccount.user = null;
+   mockAccount.loading = false;
+   mockAccount.isAuthenticated = false;
++  mockAccount.syncStatus = 'offline';
+ 
+   mockAccount.register.mockReset();
+   mockAccount.login.mockReset();
+@@ -283,4 +287,60 @@ describe('AccountScreen', () => {
+ 
+     expect(mockAccount.logout).toHaveBeenCalledTimes(1);
+   });
++
++  it('shows a live sync badge once both listeners are connected', () => {
++    mockAccount.user = {
++      uid: 'user-1',
++      email: 'test@example.com',
++    };
++    mockAccount.isAuthenticated = true;
++    mockAccount.syncStatus = 'live';
++
++    render(<AccountScreen onBack={vi.fn()} />);
++
++    expect(screen.getByText(/live sync active/i)).toBeInTheDocument();
++  });
++
++  it('shows a connecting badge while listeners are still attaching', () => {
++    mockAccount.user = {
++      uid: 'user-1',
++      email: 'test@example.com',
++    };
++    mockAccount.isAuthenticated = true;
++    mockAccount.syncStatus = 'connecting';
++
++    render(<AccountScreen onBack={vi.fn()} />);
++
++    expect(screen.getByText(/connecting/i)).toBeInTheDocument();
++  });
++
++  it('warns when sync has been interrupted', () => {
++    mockAccount.user = {
++      uid: 'user-1',
++      email: 'test@example.com',
++    };
++    mockAccount.isAuthenticated = true;
++    mockAccount.syncStatus = 'error';
++
++    render(<AccountScreen onBack={vi.fn()} />);
++
++    expect(
++      screen.getByText(/sync interrupted/i),
++    ).toBeInTheDocument();
++  });
++
++  it('shows no sync badge when offline', () => {
++    mockAccount.user = {
++      uid: 'user-1',
++      email: 'test@example.com',
++    };
++    mockAccount.isAuthenticated = true;
++    mockAccount.syncStatus = 'offline';
++
++    render(<AccountScreen onBack={vi.fn()} />);
++
++    expect(screen.queryByText(/live sync active/i)).not.toBeInTheDocument();
++    expect(screen.queryByText(/connecting/i)).not.toBeInTheDocument();
++    expect(screen.queryByText(/sync interrupted/i)).not.toBeInTheDocument();
++  });
+ });
+diff --git a/src/components/account/AccountScreen.tsx b/src/components/account/AccountScreen.tsx
+index 99b21f3..424b56e 100644
+--- a/src/components/account/AccountScreen.tsx
++++ b/src/components/account/AccountScreen.tsx
+@@ -1,16 +1,37 @@
+ import { FormEvent, useState } from 'react';
+ 
+-import { useAccount } from '../../hooks/useAccount';
++import { SyncStatus, useAccount } from '../../hooks/useAccount';
+ 
+ interface AccountScreenProps {
+   onBack: () => void;
+ }
+ 
++const SYNC_STATUS_LABEL: Record<SyncStatus, string> = {
++  offline: 'Not synced',
++  connecting: 'Connecting…',
++  live: 'Live sync active',
++  error: 'Sync interrupted — check your connection',
++};
++
++function SyncBadge({ status }: { status: SyncStatus }) {
++  if (status === 'offline') {
++    return null;
++  }
++
++  return (
++    <p className="sync-badge" data-status={status} role="status">
++      <span className="sync-dot" aria-hidden="true" />
++      {SYNC_STATUS_LABEL[status]}
++    </p>
++  );
++}
++
+ export function AccountScreen({ onBack }: AccountScreenProps) {
+   const {
+     user,
+     loading,
+     isAuthenticated,
++    syncStatus = 'offline',
+     register,
+     login,
+     logout,
+@@ -58,7 +79,7 @@ export function AccountScreen({ onBack }: AccountScreenProps) {
+ 
+   if (loading) {
+     return (
+-      <div className="container">
++      <div className="container-narrow">
+         <p>Loading account...</p>
+       </div>
+     );
+@@ -66,50 +87,71 @@ export function AccountScreen({ onBack }: AccountScreenProps) {
+ 
+   if (isAuthenticated && user) {
+     return (
+-      <div className="container">
+-        <h1>Account</h1>
+-
+-        <p>
+-          Signed in as <strong>{user.email}</strong>
+-        </p>
+-
+-        <p>
+-          Your BeadArt data can now be synchronized between devices.
+-        </p>
+-
+-        {success && <p role="status">{success}</p>}
+-
++      <div className="container-narrow">
+         <button
+           type="button"
+-          onClick={async () => {
+-            setError(null);
+-            setBusy(true);
+-
+-            try {
+-              await logout();
+-            } catch {
+-              setError('Could not sign out. Please try again.');
+-            } finally {
+-              setBusy(false);
+-            }
+-          }}
+-          disabled={busy}
++          className="btn btn-ghost btn-sm"
++          onClick={onBack}
++          style={{ marginBottom: 'var(--space-4)' }}
+         >
+-          {busy ? 'Signing out...' : 'Sign out'}
++          ← Back
+         </button>
+ 
+-        {error && <p role="alert">{error}</p>}
+-
+-        <button type="button" onClick={onBack}>
+-          Back
+-        </button>
++        <h2>Account</h2>
++
++        <div className="surface" style={{ padding: 'var(--space-5)' }}>
++          <p style={{ marginBottom: 'var(--space-2)' }}>
++            Signed in as <strong>{user.email}</strong>
++          </p>
++
++          <p>Your BeadArt data can now be synchronized between devices.</p>
++
++          <SyncBadge status={syncStatus} />
++
++          {success && (
++            <p role="status" style={{ color: 'var(--teal-hover)' }}>
++              {success}
++            </p>
++          )}
++
++          {error && <p role="alert">{error}</p>}
++
++          <button
++            type="button"
++            className="btn btn-secondary"
++            onClick={async () => {
++              setError(null);
++              setBusy(true);
++
++              try {
++                await logout();
++              } catch {
++                setError('Could not sign out. Please try again.');
++              } finally {
++                setBusy(false);
++              }
++            }}
++            disabled={busy}
++          >
++            {busy ? 'Signing out...' : 'Sign out'}
++          </button>
++        </div>
+       </div>
+     );
+   }
+ 
+   return (
+-    <div className="container">
+-      <h1>Account</h1>
++    <div className="container-narrow">
++      <button
++        type="button"
++        className="btn btn-ghost btn-sm"
++        onClick={onBack}
++        style={{ marginBottom: 'var(--space-4)' }}
++      >
++        ← Back
++      </button>
++
++      <h2>Account</h2>
+ 
+       <p>
+         An account is optional. Your BeadArt patterns are always stored
+@@ -121,10 +163,13 @@ export function AccountScreen({ onBack }: AccountScreenProps) {
+         palettes between devices.
+       </p>
+ 
+-      <div>
++      <div className="segmented" role="group" aria-label="Account mode">
+         <button
+           type="button"
++          className="segmented-btn"
++          data-active={mode === 'login'}
+           aria-label="Switch to sign in"
++          aria-pressed={mode === 'login'}
+           onClick={() => {
+             setMode('login');
+             setError(null);
+@@ -136,7 +181,10 @@ export function AccountScreen({ onBack }: AccountScreenProps) {
+ 
+         <button
+           type="button"
++          className="segmented-btn"
++          data-active={mode === 'register'}
+           aria-label="Switch to create account"
++          aria-pressed={mode === 'register'}
+           onClick={() => {
+             setMode('register');
+             setError(null);
+@@ -147,57 +195,54 @@ export function AccountScreen({ onBack }: AccountScreenProps) {
+         </button>
+       </div>
+ 
+-    <form
+-        onSubmit={handleSubmit}
+-        aria-label={
+-          mode === 'register'
+-            ? 'Create account form'
+-            : 'Sign in form'
+-        }
+-      >
+-        <label>
+-          Email
+-          <input
+-            type="email"
+-            value={email}
+-            onChange={(event) => setEmail(event.target.value)}
+-            required
+-            autoComplete="email"
+-          />
+-        </label>
+-
+-        <label>
+-          Password
+-          <input
+-            type="password"
+-            value={password}
+-            onChange={(event) => setPassword(event.target.value)}
+-            required
+-            minLength={6}
+-            autoComplete={
+-              mode === 'register'
+-                ? 'new-password'
+-                : 'current-password'
+-            }
+-          />
+-        </label>
+-
+-        <button type="submit" disabled={busy}>
+-          {busy
+-            ? mode === 'register'
+-              ? 'Creating account...'
+-              : 'Signing in...'
+-            : mode === 'register'
+-              ? 'Create account'
+-              : 'Sign in'}
+-        </button>
+-      </form>
+-
+-      {error && <p role="alert">{error}</p>}
++      <div className="surface" style={{ padding: 'var(--space-5)' }}>
++        <form
++          className="account-form"
++          onSubmit={handleSubmit}
++          aria-label={
++            mode === 'register' ? 'Create account form' : 'Sign in form'
++          }
++        >
++          <div className="field">
++            <label htmlFor="account-email">Email</label>
++            <input
++              id="account-email"
++              type="email"
++              value={email}
++              onChange={(event) => setEmail(event.target.value)}
++              required
++              autoComplete="email"
++            />
++          </div>
++
++          <div className="field">
++            <label htmlFor="account-password">Password</label>
++            <input
++              id="account-password"
++              type="password"
++              value={password}
++              onChange={(event) => setPassword(event.target.value)}
++              required
++              minLength={6}
++              autoComplete={
++                mode === 'register' ? 'new-password' : 'current-password'
++              }
++            />
++          </div>
++
++          <button type="submit" className="btn btn-primary" disabled={busy}>
++            {busy
++              ? mode === 'register'
++                ? 'Creating account...'
++                : 'Signing in...'
++              : mode === 'register'
++                ? 'Create account'
++                : 'Sign in'}
++          </button>
++        </form>
+ 
+-      <button type="button" onClick={onBack}>
+-        Back
+-      </button>
++        {error && <p role="alert">{error}</p>}
++      </div>
+     </div>
+   );
+ }
+diff --git a/src/components/home/HomeScreen.tsx b/src/components/home/HomeScreen.tsx
+index da10845..c41e2ef 100644
+--- a/src/components/home/HomeScreen.tsx
++++ b/src/components/home/HomeScreen.tsx
+@@ -234,7 +234,7 @@ export function HomeScreen({
+           <button className="btn btn-primary" onClick={onNewPattern}>
+             + New Pattern
+           </button>
+-          <button type="button" onClick={onAccount}>
++          <button type="button" className="btn btn-secondary" onClick={onAccount}>
+             Account
+           </button>
+         </div>
+diff --git a/src/index.css b/src/index.css
+index 5397ff6..dd2b5d7 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -1219,3 +1219,97 @@ textarea {
+   color: var(--teal);
+   font-weight: 600;
+ }
++
++/* Account screen — sign in / create account, and the "synced" status
++   badge shown once an account is active. */
++
++.segmented {
++  display: inline-flex;
++  padding: 4px;
++  background: var(--surface-hover);
++  border: 1px solid var(--border);
++  border-radius: var(--radius-full);
++  gap: 2px;
++  margin-bottom: var(--space-5);
++}
++
++.segmented-btn {
++  padding: var(--space-2) var(--space-5);
++  border-radius: var(--radius-full);
++  font-family: var(--font-body);
++  font-size: var(--text-sm);
++  font-weight: 600;
++  color: var(--ink-muted);
++  background: transparent;
++  border: none;
++  cursor: pointer;
++  transition: background-color 0.15s ease, color 0.15s ease;
++}
++
++.segmented-btn[data-active='true'] {
++  background: var(--surface);
++  color: var(--ink);
++  box-shadow: var(--shadow-sm);
++}
++
++.segmented-btn:hover:not([data-active='true']) {
++  color: var(--ink);
++}
++
++.account-form .btn {
++  width: 100%;
++  margin-top: var(--space-2);
++}
++
++.sync-badge {
++  display: inline-flex;
++  align-items: center;
++  gap: var(--space-2);
++  font-size: var(--text-sm);
++  font-weight: 500;
++  padding: var(--space-2) var(--space-4);
++  border-radius: var(--radius-full);
++  background: var(--surface-hover);
++  color: var(--ink-muted);
++  margin: 0 0 var(--space-4);
++}
++
++.sync-dot {
++  width: 8px;
++  height: 8px;
++  border-radius: 50%;
++  background: var(--ink-muted);
++  flex-shrink: 0;
++}
++
++.sync-badge[data-status='live'] {
++  color: var(--teal-hover);
++}
++
++.sync-badge[data-status='live'] .sync-dot {
++  background: var(--teal);
++  box-shadow: 0 0 0 3px rgba(30, 158, 140, 0.18);
++}
++
++.sync-badge[data-status='connecting'] .sync-dot {
++  background: var(--gold);
++  animation: sync-pulse 1.2s ease-in-out infinite;
++}
++
++.sync-badge[data-status='error'] {
++  color: var(--danger);
++  background: var(--danger-surface);
++}
++
++.sync-badge[data-status='error'] .sync-dot {
++  background: var(--danger);
++}
++
++@keyframes sync-pulse {
++  0%, 100% {
++    opacity: 1;
++  }
++  50% {
++    opacity: 0.4;
++  }
++}
+-- 
+2.43.0
+

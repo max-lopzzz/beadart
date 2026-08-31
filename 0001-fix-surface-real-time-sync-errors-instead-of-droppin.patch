@@ -1,0 +1,581 @@
+From f1ea9519a626d15dc3928ab0f18c35bb6345bae1 Mon Sep 17 00:00:00 2001
+From: Maximiliano <m.lopz.montn@gmail.com>
+Date: Mon, 31 Aug 2026 19:28:15 +0000
+Subject: [PATCH 1/2] fix: surface real-time sync errors instead of dropping
+ them
+
+- syncPattern was logging every call with console.log, including a
+  no-op call with no signed-in user. Drop the leftover debug logging.
+- subscribeToAccountPatterns/subscribeToAccountPalettes only logged
+  onSnapshot errors to the console, so a lost connection on one
+  device silently stopped that device's real-time sync with no way
+  for the UI to notice. Both now accept an onError callback.
+- useAccount exposes a new syncStatus ('offline' | 'connecting' |
+  'live' | 'error') derived from the two listeners, and recovers
+  back to 'live' the next time a snapshot succeeds after an error
+  (previously it would stay stuck on 'error' forever, even after the
+  connection came back).
+- Add test coverage for accountRepo's real-time subscriptions and
+  useAccount's syncStatus state machine, neither of which had any
+  tests before.
+---
+ src/hooks/useAccount.test.ts        | 156 ++++++++++++++++++
+ src/hooks/useAccount.ts             |  45 ++++-
+ src/lib/account/accountRepo.test.ts | 245 ++++++++++++++++++++++++++++
+ src/lib/account/accountRepo.ts      |  13 +-
+ 4 files changed, 450 insertions(+), 9 deletions(-)
+ create mode 100644 src/hooks/useAccount.test.ts
+ create mode 100644 src/lib/account/accountRepo.test.ts
+
+diff --git a/src/hooks/useAccount.test.ts b/src/hooks/useAccount.test.ts
+new file mode 100644
+index 0000000..6cc8095
+--- /dev/null
++++ b/src/hooks/useAccount.test.ts
+@@ -0,0 +1,156 @@
++import { describe, it, expect, vi, beforeEach } from 'vitest';
++import { act, renderHook, waitFor } from '@testing-library/react';
++
++type AuthCallback = (user: { uid: string; email: string } | null) => void;
++
++let authCallback: AuthCallback | null = null;
++let patternsOnChange: (() => void) | null = null;
++let patternsOnError: ((error: Error) => void) | null = null;
++let palettesOnChange: (() => void) | null = null;
++let palettesOnError: ((error: Error) => void) | null = null;
++
++const mockUser = { uid: 'user-1', email: 'max@example.com' };
++
++vi.mock('../lib/account/auth', () => ({
++  getCurrentUser: vi.fn(() => null),
++  createAccount: vi.fn(),
++  signIn: vi.fn(),
++  logOut: vi.fn(),
++  subscribeToAuthState: vi.fn((callback: AuthCallback) => {
++    authCallback = callback;
++    return () => {
++      authCallback = null;
++    };
++  }),
++}));
++
++vi.mock('../lib/account/accountRepo', () => ({
++  migrateLocalDataToAccount: vi.fn(),
++  importAccountDataToLocal: vi.fn(),
++  subscribeToAccountPatterns: vi.fn(
++    (onChange?: () => void, onError?: (error: Error) => void) => {
++      patternsOnChange = onChange ?? null;
++      patternsOnError = onError ?? null;
++      return vi.fn();
++    },
++  ),
++  subscribeToAccountPalettes: vi.fn(
++    (onChange?: () => void, onError?: (error: Error) => void) => {
++      palettesOnChange = onChange ?? null;
++      palettesOnError = onError ?? null;
++      return vi.fn();
++    },
++  ),
++}));
++
++import { useAccount } from './useAccount';
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  authCallback = null;
++  patternsOnChange = null;
++  patternsOnError = null;
++  palettesOnChange = null;
++  palettesOnError = null;
++});
++
++describe('useAccount syncStatus', () => {
++  it('starts offline when signed out', async () => {
++    const { result } = renderHook(() => useAccount());
++
++    act(() => {
++      authCallback?.(null);
++    });
++
++    await waitFor(() => expect(result.current.loading).toBe(false));
++    expect(result.current.syncStatus).toBe('offline');
++  });
++
++  it('goes connecting -> live once both listeners report a snapshot', async () => {
++    const { result } = renderHook(() => useAccount());
++
++    act(() => {
++      authCallback?.(mockUser);
++    });
++
++    await waitFor(() => expect(result.current.loading).toBe(false));
++    expect(result.current.syncStatus).toBe('connecting');
++
++    act(() => {
++      patternsOnChange?.();
++    });
++    expect(result.current.syncStatus).toBe('connecting');
++
++    act(() => {
++      palettesOnChange?.();
++    });
++    expect(result.current.syncStatus).toBe('live');
++  });
++
++  it('flips to error if either listener fails, and recovers on the next snapshot', async () => {
++    const { result } = renderHook(() => useAccount());
++
++    act(() => {
++      authCallback?.(mockUser);
++    });
++
++    await waitFor(() => expect(result.current.loading).toBe(false));
++
++    act(() => {
++      patternsOnChange?.();
++      palettesOnChange?.();
++    });
++    expect(result.current.syncStatus).toBe('live');
++
++    act(() => {
++      patternsOnError?.(new Error('offline'));
++    });
++    expect(result.current.syncStatus).toBe('error');
++
++    act(() => {
++      patternsOnChange?.();
++    });
++    expect(result.current.syncStatus).toBe('live');
++  });
++
++  it('also flips to error when the palette listener fails', async () => {
++    const { result } = renderHook(() => useAccount());
++
++    act(() => {
++      authCallback?.(mockUser);
++    });
++
++    await waitFor(() => expect(result.current.loading).toBe(false));
++
++    act(() => {
++      patternsOnChange?.();
++      palettesOnChange?.();
++    });
++    expect(result.current.syncStatus).toBe('live');
++
++    act(() => {
++      palettesOnError?.(new Error('unavailable'));
++    });
++    expect(result.current.syncStatus).toBe('error');
++  });
++
++  it('drops back to offline after signing out', async () => {
++    const { result } = renderHook(() => useAccount());
++
++    act(() => {
++      authCallback?.(mockUser);
++    });
++    await waitFor(() => expect(result.current.loading).toBe(false));
++
++    act(() => {
++      patternsOnChange?.();
++      palettesOnChange?.();
++    });
++    expect(result.current.syncStatus).toBe('live');
++
++    act(() => {
++      authCallback?.(null);
++    });
++    expect(result.current.syncStatus).toBe('offline');
++  });
++});
+diff --git a/src/hooks/useAccount.ts b/src/hooks/useAccount.ts
+index e7a1fd5..2bc8cd6 100644
+--- a/src/hooks/useAccount.ts
++++ b/src/hooks/useAccount.ts
+@@ -15,9 +15,20 @@ import {
+   subscribeToAccountPalettes,
+ } from '../lib/account/accountRepo';
+ 
++/**
++ * - 'offline': no account is signed in; data only lives on this device.
++ * - 'connecting': signed in, waiting for the first snapshot from Firestore.
++ * - 'live': both the pattern and palette listeners are attached and
++ *   healthy — changes on any device will appear here in real time.
++ * - 'error': a listener reported an error (e.g. the device lost network,
++ *   or Firestore rejected a read). Sync has stopped until reconnected.
++ */
++export type SyncStatus = 'offline' | 'connecting' | 'live' | 'error';
++
+ export function useAccount() {
+   const [user, setUser] = useState(() => getCurrentUser());
+   const [loading, setLoading] = useState(true);
++  const [syncStatus, setSyncStatus] = useState<SyncStatus>('offline');
+ 
+   useEffect(() => {
+     return subscribeToAuthState((nextUser) => {
+@@ -28,11 +39,40 @@ export function useAccount() {
+ 
+   useEffect(() => {
+     if (!user) {
++      setSyncStatus('offline');
+       return;
+     }
+ 
+-    const unsubscribePatterns = subscribeToAccountPatterns();
+-    const unsubscribePalettes = subscribeToAccountPalettes();
++    setSyncStatus('connecting');
++
++    let patternsReady = false;
++    let palettesReady = false;
++
++    const handlePatternsReady = () => {
++      patternsReady = true;
++      // A successful snapshot means the listener is healthy again, even
++      // if a previous snapshot on either collection had errored out.
++      setSyncStatus(palettesReady ? 'live' : 'connecting');
++    };
++
++    const handlePalettesReady = () => {
++      palettesReady = true;
++      setSyncStatus(patternsReady ? 'live' : 'connecting');
++    };
++
++    const handleError = () => {
++      setSyncStatus('error');
++    };
++
++    const unsubscribePatterns = subscribeToAccountPatterns(
++      handlePatternsReady,
++      handleError,
++    );
++
++    const unsubscribePalettes = subscribeToAccountPalettes(
++      handlePalettesReady,
++      handleError,
++    );
+ 
+     return () => {
+       unsubscribePatterns();
+@@ -66,6 +106,7 @@ export function useAccount() {
+     user,
+     loading,
+     isAuthenticated: user !== null,
++    syncStatus,
+     register,
+     login,
+     logout,
+diff --git a/src/lib/account/accountRepo.test.ts b/src/lib/account/accountRepo.test.ts
+new file mode 100644
+index 0000000..6276345
+--- /dev/null
++++ b/src/lib/account/accountRepo.test.ts
+@@ -0,0 +1,245 @@
++import { describe, it, expect, vi, beforeEach } from 'vitest';
++
++import { Pattern } from '../../types/pattern';
++import { Palette } from '../../types/palette';
++
++type SnapshotHandler = (snapshot: unknown) => void | Promise<void>;
++type ErrorHandler = (error: Error) => void;
++
++// Captures the handlers passed to onSnapshot so tests can drive them
++// manually, as if a change had arrived from Firestore.
++let capturedOnNext: SnapshotHandler | null = null;
++let capturedOnError: ErrorHandler | null = null;
++
++vi.mock('firebase/firestore', () => ({
++  collection: vi.fn((_db, ...segments) => ({ path: segments.join('/') })),
++  doc: vi.fn((_db, ...segments) => ({ path: segments.join('/') })),
++  setDoc: vi.fn(),
++  getDocs: vi.fn(),
++  deleteDoc: vi.fn(),
++  onSnapshot: vi.fn(
++    (_query, onNext: SnapshotHandler, onError: ErrorHandler) => {
++      capturedOnNext = onNext;
++      capturedOnError = onError;
++      return vi.fn(); // unsubscribe
++    },
++  ),
++}));
++
++vi.mock('../sharing/firebaseClient', () => ({
++  getSharedPatternsDb: vi.fn(() => ({ mocked: true })),
++}));
++
++vi.mock('./auth', () => ({
++  getCurrentUser: vi.fn(),
++}));
++
++vi.mock('../storage/patternsRepo', () => ({
++  savePattern: vi.fn(),
++  deletePattern: vi.fn(),
++}));
++
++vi.mock('../storage/palettesRepo', () => ({
++  savePalette: vi.fn(),
++  deletePalette: vi.fn(),
++}));
++
++import { setDoc, deleteDoc } from 'firebase/firestore';
++import { getCurrentUser } from './auth';
++import { savePattern, deletePattern } from '../storage/patternsRepo';
++import { savePalette, deletePalette } from '../storage/palettesRepo';
++
++import {
++  syncPattern,
++  syncPalette,
++  deleteSyncedPattern,
++  deleteSyncedPalette,
++  subscribeToAccountPatterns,
++  subscribeToAccountPalettes,
++} from './accountRepo';
++
++const mockedGetCurrentUser = vi.mocked(getCurrentUser);
++const mockedSetDoc = vi.mocked(setDoc);
++const mockedDeleteDoc = vi.mocked(deleteDoc);
++const mockedSavePattern = vi.mocked(savePattern);
++const mockedDeletePattern = vi.mocked(deletePattern);
++const mockedSavePalette = vi.mocked(savePalette);
++const mockedDeletePalette = vi.mocked(deletePalette);
++
++function makePattern(overrides: Partial<Pattern> = {}): Pattern {
++  return {
++    id: 'pattern-1',
++    name: 'Test Pattern',
++    createdAt: '2026-08-02T00:00:00.000Z',
++    rows: 2,
++    cols: 2,
++    cellColors: [
++      ['Red', 'Red'],
++      ['Blue', 'Blue'],
++    ],
++    paletteId: 'default-bead-palette',
++    completedColors: [],
++    thumbnail: '',
++    updatedAt: '2026-01-01T00:00:00.000Z',
++    ...overrides,
++  };
++}
++
++const palette: Palette = {
++  id: 'default-bead-palette',
++  name: 'Default',
++  isBuiltIn: true,
++  colors: [
++    { name: 'Red', hex: '#ff0000' },
++    { name: 'Blue', hex: '#0000ff' },
++  ],
++};
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  capturedOnNext = null;
++  capturedOnError = null;
++});
++
++describe('syncPattern / syncPalette', () => {
++  it('does nothing when no user is signed in', async () => {
++    mockedGetCurrentUser.mockReturnValue(null);
++
++    await syncPattern(makePattern());
++    await syncPalette(palette);
++
++    expect(mockedSetDoc).not.toHaveBeenCalled();
++  });
++
++  it('uploads the pattern with cellColors flattened for Firestore', async () => {
++    mockedGetCurrentUser.mockReturnValue({ uid: 'user-1' } as never);
++
++    await syncPattern(makePattern());
++
++    expect(mockedSetDoc).toHaveBeenCalledTimes(1);
++
++    const [, payload] = mockedSetDoc.mock.calls[0];
++    expect((payload as { cellColors: unknown }).cellColors).toEqual([
++      'Red',
++      'Red',
++      'Blue',
++      'Blue',
++    ]);
++  });
++
++  it('deletes the remote pattern and palette when signed in', async () => {
++    mockedGetCurrentUser.mockReturnValue({ uid: 'user-1' } as never);
++
++    await deleteSyncedPattern('pattern-1');
++    await deleteSyncedPalette('palette-1');
++
++    expect(mockedDeleteDoc).toHaveBeenCalledTimes(2);
++  });
++});
++
++describe('subscribeToAccountPatterns', () => {
++  it('returns a no-op unsubscribe when signed out', () => {
++    mockedGetCurrentUser.mockReturnValue(null);
++
++    const unsubscribe = subscribeToAccountPatterns();
++
++    expect(capturedOnNext).toBeNull();
++    expect(() => unsubscribe()).not.toThrow();
++  });
++
++  it('mirrors remote changes into local storage and notifies listeners', async () => {
++    mockedGetCurrentUser.mockReturnValue({ uid: 'user-1' } as never);
++
++    const onChange = vi.fn();
++    const eventListener = vi.fn();
++    window.addEventListener('beadart-patterns-updated', eventListener);
++
++    subscribeToAccountPatterns(onChange);
++    expect(capturedOnNext).not.toBeNull();
++
++    await capturedOnNext!({
++      docChanges: () => [
++        {
++          type: 'added',
++          doc: {
++            id: 'pattern-1',
++            data: () => ({
++              ...makePattern(),
++              cellColors: ['Red', 'Red', 'Blue', 'Blue'],
++            }),
++          },
++        },
++        {
++          type: 'removed',
++          doc: { id: 'pattern-2', data: () => ({}) },
++        },
++      ],
++    });
++
++    expect(mockedSavePattern).toHaveBeenCalledWith(
++      expect.objectContaining({
++        id: 'pattern-1',
++        cellColors: [
++          ['Red', 'Red'],
++          ['Blue', 'Blue'],
++        ],
++      }),
++    );
++
++    expect(mockedDeletePattern).toHaveBeenCalledWith('pattern-2');
++    expect(eventListener).toHaveBeenCalledTimes(1);
++    expect(onChange).toHaveBeenCalledTimes(1);
++
++    window.removeEventListener('beadart-patterns-updated', eventListener);
++  });
++
++  it('reports listener errors through onError without throwing', () => {
++    mockedGetCurrentUser.mockReturnValue({ uid: 'user-1' } as never);
++
++    const onError = vi.fn();
++    subscribeToAccountPatterns(undefined, onError);
++
++    const error = new Error('permission-denied');
++    capturedOnError!(error);
++
++    expect(onError).toHaveBeenCalledWith(error);
++  });
++});
++
++describe('subscribeToAccountPalettes', () => {
++  it('mirrors remote palette changes into local storage', async () => {
++    mockedGetCurrentUser.mockReturnValue({ uid: 'user-1' } as never);
++
++    const onChange = vi.fn();
++    subscribeToAccountPalettes(onChange);
++
++    await capturedOnNext!({
++      docChanges: () => [
++        {
++          type: 'added',
++          doc: { id: 'palette-1', data: () => palette },
++        },
++        {
++          type: 'removed',
++          doc: { id: 'palette-2', data: () => ({}) },
++        },
++      ],
++    });
++
++    expect(mockedSavePalette).toHaveBeenCalledWith(palette);
++    expect(mockedDeletePalette).toHaveBeenCalledWith('palette-2');
++    expect(onChange).toHaveBeenCalledTimes(1);
++  });
++
++  it('reports listener errors through onError', () => {
++    mockedGetCurrentUser.mockReturnValue({ uid: 'user-1' } as never);
++
++    const onError = vi.fn();
++    subscribeToAccountPalettes(undefined, onError);
++
++    const error = new Error('unavailable');
++    capturedOnError!(error);
++
++    expect(onError).toHaveBeenCalledWith(error);
++  });
++});
+diff --git a/src/lib/account/accountRepo.ts b/src/lib/account/accountRepo.ts
+index 5f10f20..5c415dd 100644
+--- a/src/lib/account/accountRepo.ts
++++ b/src/lib/account/accountRepo.ts
+@@ -128,11 +128,6 @@ export async function downloadAccountData(): Promise<{
+ export async function syncPattern(pattern: Pattern): Promise<void> {
+   const user = getCurrentUser();
+ 
+-  console.log('[syncPattern]', {
+-    patternId: pattern.id,
+-    user: user?.uid ?? null,
+-  });
+-
+   if (!user) {
+     return;
+   }
+@@ -143,8 +138,6 @@ export async function syncPattern(pattern: Pattern): Promise<void> {
+     doc(db, 'users', user.uid, 'patterns', pattern.id),
+     patternToFirestore(pattern),
+   );
+-
+-  console.log('[syncPattern] uploaded', pattern.id);
+ }
+ 
+ export async function deleteSyncedPattern(
+@@ -221,6 +214,7 @@ export async function importAccountDataToLocal(): Promise<void> {
+  */
+ export function subscribeToAccountPatterns(
+   onChange?: () => void,
++  onError?: (error: Error) => void,
+ ): () => void {
+   const user = getCurrentUser();
+ 
+@@ -259,6 +253,8 @@ export function subscribeToAccountPatterns(
+         '[accountRepo] Pattern subscription failed:',
+         error,
+       );
++
++      onError?.(error);
+     },
+   );
+ }
+@@ -268,6 +264,7 @@ export function subscribeToAccountPatterns(
+  */
+ export function subscribeToAccountPalettes(
+   onChange?: () => void,
++  onError?: (error: Error) => void,
+ ): () => void {
+   const user = getCurrentUser();
+ 
+@@ -302,6 +299,8 @@ export function subscribeToAccountPalettes(
+         '[accountRepo] Palette subscription failed:',
+         error,
+       );
++
++      onError?.(error);
+     },
+   );
+ }
+\ No newline at end of file
+-- 
+2.43.0
+

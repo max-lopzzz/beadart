@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
+import { useAccount } from './hooks/useAccount';
 import { HomeScreen } from './components/home/HomeScreen';
 import { NewPatternWizard } from './components/new-pattern/NewPatternWizard';
 import { WorkingView } from './components/working/WorkingView';
@@ -22,6 +23,8 @@ type Screen =
   | { name: 'account' };
 
 export default function App() {
+  const account = useAccount();
+
   const [screen, setScreen] = useState<Screen>({ name: 'home' });
 
   const params = new URLSearchParams(window.location.search);
@@ -71,7 +74,12 @@ export default function App() {
   }
 
   if (screen.name === 'account') {
-    return <AccountScreen onBack={() => setScreen({ name: 'home' })} />;
+    return (
+      <AccountScreen
+        onBack={() => setScreen({ name: 'home' })}
+        account={account}
+      />
+    );
   }
 
   return <PaletteManageScreen onBack={() => setScreen({ name: 'home' })} />;

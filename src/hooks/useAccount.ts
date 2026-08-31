@@ -25,6 +25,8 @@ import {
  */
 export type SyncStatus = 'offline' | 'connecting' | 'live' | 'error';
 
+export type AccountState = ReturnType<typeof useAccount>;
+
 export function useAccount() {
   const [user, setUser] = useState(() => getCurrentUser());
   const [loading, setLoading] = useState(true);
@@ -50,8 +52,6 @@ export function useAccount() {
 
     const handlePatternsReady = () => {
       patternsReady = true;
-      // A successful snapshot means the listener is healthy again, even
-      // if a previous snapshot on either collection had errored out.
       setSyncStatus(palettesReady ? 'live' : 'connecting');
     };
 
@@ -82,21 +82,15 @@ export function useAccount() {
 
   const register = async (email: string, password: string) => {
     const createdUser = await createAccount(email, password);
-
-    // The user's existing local data becomes their initial cloud data.
     await migrateLocalDataToAccount();
-
     return createdUser;
   };
 
   const login = async (email: string, password: string) => {
     const signedInUser = await signIn(email, password);
-
-    // Merge local and cloud data instead of blindly overwriting local data.
     await syncLocalDataWithAccount();
-
     return signedInUser;
-    };
+  };
 
   const logout = async () => {
     await logOut();
