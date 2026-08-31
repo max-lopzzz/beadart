@@ -66,6 +66,7 @@ export function usePatterns({ renderThumbnail = renderPatternToDataUrl }: UsePat
       const thumbnail = renderThumbnail(updated, palette, { maxSize: 200 });
       await savePattern({ ...updated, thumbnail });
       await refresh();
+      return { ...updated, thumbnail };
     },
     [refresh, renderThumbnail],
   );
@@ -92,6 +93,7 @@ export function usePatterns({ renderThumbnail = renderPatternToDataUrl }: UsePat
       const thumbnail = renderThumbnail(updated, palette, { maxSize: 200 });
       await savePattern({ ...updated, thumbnail });
       await refresh();
+      return { ...updated, thumbnail };
     },
     [refresh, renderThumbnail],
   );

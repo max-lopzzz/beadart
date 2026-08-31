@@ -37,6 +37,7 @@ const pattern: Pattern = {
   paletteId: 'p1',
   completedColors: [],
   thumbnail: '',
+  updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
 describe('WorkingView', () => {

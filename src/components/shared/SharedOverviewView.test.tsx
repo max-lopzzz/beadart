@@ -1,6 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+
 import { render, screen, waitFor } from '@testing-library/react';
+
 import { SharedOverviewView } from './SharedOverviewView';
+
 import { fetchSharedOverview } from '../../lib/sharing/shareRepo';
 
 vi.mock('../../lib/sharing/shareRepo', () => ({
@@ -9,52 +12,109 @@ vi.mock('../../lib/sharing/shareRepo', () => ({
 
 const mockedFetch = vi.mocked(fetchSharedOverview);
 
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
 describe('SharedOverviewView', () => {
-  it('shows pattern count, bead totals, and overall percent', async () => {
+  it('shows overview progress, pattern count, bead totals, and materials', async () => {
     mockedFetch.mockResolvedValue({
-      patternCount: 3,
-      beadsPlaced: 150,
-      beadsTotal: 200,
+      patternCount: 2,
+      beadsPlaced: 6,
+      beadsTotal: 8,
       percent: 75,
       materials: [
-        { name: 'Red', hex: '#ff0000', total: 100, remaining: 0 },
-        { name: 'Blue', hex: '#0000ff', total: 100, remaining: 50 },
+        {
+          name: 'Blue',
+          hex: '#0000ff',
+          total: 4,
+          remaining: 4,
+        },
+        {
+          name: 'Red',
+          hex: '#ff0000',
+          total: 4,
+          remaining: 2,
+        },
       ],
       updatedAt: '2026-08-02T00:00:00.000Z',
     });
 
-    render(<SharedOverviewView slug="abc123" />);
+    render(<SharedOverviewView slug="overview-123" />);
 
-    await waitFor(() => screen.getByText(/3 patterns/i));
-    expect(screen.getByText(/150 \/ 200 beads placed/i)).toBeInTheDocument();
+    await waitFor(() => screen.getByText('Bead art progress'));
+
+    expect(screen.getByText(/2 patterns/i)).toBeInTheDocument();
+    expect(screen.getByText(/6 \/ 8 beads placed/i)).toBeInTheDocument();
+
+    expect(screen.getByText('Blue')).toBeInTheDocument();
     expect(screen.getByText('Red')).toBeInTheDocument();
-    expect(screen.getByText('done')).toBeInTheDocument();
-    expect(screen.getByText('50 left')).toBeInTheDocument();
+    expect(screen.getByText('4 left')).toBeInTheDocument();
+    expect(screen.getByText('2 left')).toBeInTheDocument();
   });
 
-  it('uses singular "pattern" for a count of one', async () => {
+  it('shows singular pattern when there is only one pattern', async () => {
     mockedFetch.mockResolvedValue({
       patternCount: 1,
-      beadsPlaced: 10,
-      beadsTotal: 10,
+      beadsPlaced: 4,
+      beadsTotal: 4,
+      percent: 100,
+      materials: [
+        {
+          name: 'Red',
+          hex: '#ff0000',
+          total: 4,
+          remaining: 0,
+        },
+      ],
+      updatedAt: '2026-08-02T00:00:00.000Z',
+    });
+
+    render(<SharedOverviewView slug="overview-123" />);
+
+    await waitFor(() => screen.getByText('Bead art progress'));
+
+    expect(screen.getByText(/1 pattern ·/i)).toBeInTheDocument();
+    expect(screen.getByText(/4 \/ 4 beads placed/i)).toBeInTheDocument();
+    expect(screen.getByText('done')).toBeInTheDocument();
+  });
+
+  it('shows a not-found message when the slug has no shared overview', async () => {
+    mockedFetch.mockResolvedValue(null);
+
+    render(<SharedOverviewView slug="missing" />);
+
+    await waitFor(() =>
+      screen.getByText(/this overview isn't shared anymore/i),
+    );
+  });
+
+  it('shows an error message when the fetch fails', async () => {
+    mockedFetch.mockRejectedValue(new Error('network down'));
+
+    render(<SharedOverviewView slug="overview-123" />);
+
+    await waitFor(() =>
+      screen.getByText(/couldn't load this overview/i),
+    );
+  });
+
+  it('shows no materials list when the overview has no materials', async () => {
+    mockedFetch.mockResolvedValue({
+      patternCount: 0,
+      beadsPlaced: 0,
+      beadsTotal: 0,
       percent: 100,
       materials: [],
       updatedAt: '2026-08-02T00:00:00.000Z',
     });
 
-    render(<SharedOverviewView slug="abc123" />);
-    await waitFor(() => screen.getByText(/1 pattern ·/i));
-  });
+    render(<SharedOverviewView slug="empty-overview" />);
 
-  it('shows a not-found message when the overview is no longer shared', async () => {
-    mockedFetch.mockResolvedValue(null);
-    render(<SharedOverviewView slug="missing" />);
-    await waitFor(() => screen.getByText(/isn't shared anymore/i));
-  });
+    await waitFor(() => screen.getByText('Bead art progress'));
 
-  it('shows an error message when the fetch fails', async () => {
-    mockedFetch.mockRejectedValue(new Error('network down'));
-    render(<SharedOverviewView slug="abc123" />);
-    await waitFor(() => screen.getByText(/couldn't load this overview/i));
+    expect(screen.getByText(/0 patterns ·/i)).toBeInTheDocument();
+    expect(screen.getByText(/0 \/ 0 beads placed/i)).toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
   });
 });

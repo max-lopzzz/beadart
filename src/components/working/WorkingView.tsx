@@ -134,7 +134,15 @@ export function WorkingView({
 
   const handleReplace = async (newColorName: string) => {
     if (!replacingColor) return;
-    await replaceColor(pattern.id, replacingColor, newColorName, palette);
+
+    const updated = await replaceColor(
+      pattern.id,
+      replacingColor,
+      newColorName,
+      palette,
+    );
+
+    syncSharedPattern(updated, palette);
     setReplacingColor(null);
   };
 
@@ -156,7 +164,15 @@ export function WorkingView({
       const [row, col] = key.split('-').map(Number);
       return { row, col };
     });
-    await setCellsColor(pattern.id, cells, colorName, palette);
+
+    const updated = await setCellsColor(
+      pattern.id,
+      cells,
+      colorName,
+      palette,
+    );
+
+    syncSharedPattern(updated, palette);
     setSelectedCells(new Set());
   };
 

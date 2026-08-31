@@ -20,6 +20,7 @@ export interface Pattern {
   id: string;
   name: string;
   createdAt: string;
+  updatedAt: string;
   rows: number;
   cols: number;
   cellColors: string[][];
