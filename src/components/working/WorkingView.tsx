@@ -314,7 +314,14 @@ export function WorkingView({
             </div>
           </div>
           <div ref={setGridEl}>
-          <table style={{ margin: '0 auto' }}>
+          <table
+            style={{
+              margin: '0 auto',
+              borderCollapse: 'collapse',
+              borderSpacing: 0,
+              tableLayout: 'fixed',
+            }}
+          >
             <tbody>
               {pattern.cellColors.map((row, rowIndex) => (
                 <tr key={rowIndex}>

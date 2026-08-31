@@ -995,6 +995,31 @@ label {
   border-top: 1px solid var(--border);
 }
 
+.pixel-grid-wrap table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.pixel-grid-wrap td {
+  padding: 0;
+  margin: 0;
+  line-height: 0;
+  vertical-align: top;
+}
+
+.pixel-grid-wrap td > button {
+  display: block;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  line-height: 0;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
 .legend-header {
   display: flex;
   align-items: center;
