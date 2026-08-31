@@ -21,6 +21,7 @@ interface HomeScreenProps {
   onOpenPattern: (patternId: string) => void;
   onNewPattern: () => void;
   onManagePalettes: () => void;
+  onAccount: () => void;
 }
 
 function WordmarkIcon({ size = 32 }: { size?: number }) {
@@ -89,7 +90,12 @@ function sortPatterns(
   return [...patterns].sort((a, b) => (sortDirection === 'desc' ? -compare(a, b) : compare(a, b)));
 }
 
-export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: HomeScreenProps) {
+export function HomeScreen({
+  onOpenPattern,
+  onNewPattern,
+  onManagePalettes,
+  onAccount,
+}: HomeScreenProps) {
   const { patterns, loading: patternsLoading, removePattern, setShare } = usePatterns();
   const { palettes, loading: palettesLoading } = usePalettes();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -227,6 +233,9 @@ export function HomeScreen({ onOpenPattern, onNewPattern, onManagePalettes }: Ho
           </button>
           <button className="btn btn-primary" onClick={onNewPattern}>
             + New Pattern
+          </button>
+          <button type="button" onClick={onAccount}>
+            Account
           </button>
         </div>
       </div>

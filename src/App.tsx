@@ -3,6 +3,7 @@ import { HomeScreen } from './components/home/HomeScreen';
 import { NewPatternWizard } from './components/new-pattern/NewPatternWizard';
 import { WorkingView } from './components/working/WorkingView';
 import { PaletteManageScreen } from './components/palettes/PaletteManageScreen';
+import { AccountScreen } from './components/account/AccountScreen';
 
 const SharedPatternView = lazy(() =>
   import('./components/shared/SharedPatternView').then((m) => ({ default: m.SharedPatternView })),
@@ -17,7 +18,8 @@ type Screen =
   | { name: 'home' }
   | { name: 'new-pattern' }
   | { name: 'working'; patternId: string }
-  | { name: 'palettes' };
+  | { name: 'palettes' }
+  | { name: 'account' };
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' });
@@ -43,9 +45,12 @@ export default function App() {
   if (screen.name === 'home') {
     return (
       <HomeScreen
-        onOpenPattern={(patternId) => setScreen({ name: 'working', patternId })}
+        onOpenPattern={(patternId) =>
+          setScreen({ name: 'working', patternId })
+        }
         onNewPattern={() => setScreen({ name: 'new-pattern' })}
         onManagePalettes={() => setScreen({ name: 'palettes' })}
+        onAccount={() => setScreen({ name: 'account' })}
       />
     );
   }
@@ -63,6 +68,10 @@ export default function App() {
     return (
       <WorkingView patternId={screen.patternId} onBack={() => setScreen({ name: 'home' })} />
     );
+  }
+
+  if (screen.name === 'account') {
+    return <AccountScreen onBack={() => setScreen({ name: 'home' })} />;
   }
 
   return <PaletteManageScreen onBack={() => setScreen({ name: 'home' })} />;
