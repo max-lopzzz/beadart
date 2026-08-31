@@ -10,6 +10,7 @@ import {
 import userEvent from '@testing-library/user-event';
 
 import { AccountScreen } from './AccountScreen';
+import type { SyncStatus } from '../../hooks/useAccount';
 
 type MockUser = {
   uid: string;
@@ -20,6 +21,7 @@ const mockAccount: {
   user: MockUser | null;
   loading: boolean;
   isAuthenticated: boolean;
+  syncStatus: SyncStatus;
   register: ReturnType<typeof vi.fn>;
   login: ReturnType<typeof vi.fn>;
   logout: ReturnType<typeof vi.fn>;
@@ -27,6 +29,7 @@ const mockAccount: {
   user: null,
   loading: false,
   isAuthenticated: false,
+  syncStatus: 'offline',
   register: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
@@ -42,6 +45,7 @@ afterEach(() => {
   mockAccount.user = null;
   mockAccount.loading = false;
   mockAccount.isAuthenticated = false;
+  mockAccount.syncStatus = 'offline';
 
   mockAccount.register.mockReset();
   mockAccount.login.mockReset();
@@ -282,5 +286,61 @@ describe('AccountScreen', () => {
     );
 
     expect(mockAccount.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a live sync badge once both listeners are connected', () => {
+    mockAccount.user = {
+      uid: 'user-1',
+      email: 'test@example.com',
+    };
+    mockAccount.isAuthenticated = true;
+    mockAccount.syncStatus = 'live';
+
+    render(<AccountScreen onBack={vi.fn()} />);
+
+    expect(screen.getByText(/live sync active/i)).toBeInTheDocument();
+  });
+
+  it('shows a connecting badge while listeners are still attaching', () => {
+    mockAccount.user = {
+      uid: 'user-1',
+      email: 'test@example.com',
+    };
+    mockAccount.isAuthenticated = true;
+    mockAccount.syncStatus = 'connecting';
+
+    render(<AccountScreen onBack={vi.fn()} />);
+
+    expect(screen.getByText(/connecting/i)).toBeInTheDocument();
+  });
+
+  it('warns when sync has been interrupted', () => {
+    mockAccount.user = {
+      uid: 'user-1',
+      email: 'test@example.com',
+    };
+    mockAccount.isAuthenticated = true;
+    mockAccount.syncStatus = 'error';
+
+    render(<AccountScreen onBack={vi.fn()} />);
+
+    expect(
+      screen.getByText(/sync interrupted/i),
+    ).toBeInTheDocument();
+  });
+
+  it('shows no sync badge when offline', () => {
+    mockAccount.user = {
+      uid: 'user-1',
+      email: 'test@example.com',
+    };
+    mockAccount.isAuthenticated = true;
+    mockAccount.syncStatus = 'offline';
+
+    render(<AccountScreen onBack={vi.fn()} />);
+
+    expect(screen.queryByText(/live sync active/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/connecting/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/sync interrupted/i)).not.toBeInTheDocument();
   });
 });
