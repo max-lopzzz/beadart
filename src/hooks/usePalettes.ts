@@ -31,6 +31,24 @@ export function usePalettes() {
     })();
   }, [refresh]);
 
+  useEffect(() => {
+    const handlePalettesUpdated = () => {
+      void refresh();
+    };
+
+    window.addEventListener(
+      'beadart-palettes-updated',
+      handlePalettesUpdated,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'beadart-palettes-updated',
+        handlePalettesUpdated,
+      );
+    };
+  }, [refresh]);
+
   const importPalette = useCallback(
     async (palette: Palette) => {
       await savePalette(palette);

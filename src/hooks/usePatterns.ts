@@ -42,6 +42,24 @@ export function usePatterns({
     })();
   }, [refresh]);
 
+  useEffect(() => {
+    const handlePatternsUpdated = () => {
+      void refresh();
+    };
+
+    window.addEventListener(
+      'beadart-patterns-updated',
+      handlePatternsUpdated,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'beadart-patterns-updated',
+        handlePatternsUpdated,
+      );
+    };
+  }, [refresh]);
+
   const addPattern = useCallback(
     async (pattern: Pattern) => {
       await savePattern(pattern);

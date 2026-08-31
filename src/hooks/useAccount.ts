@@ -11,6 +11,8 @@ import {
 import {
   migrateLocalDataToAccount,
   importAccountDataToLocal,
+  subscribeToAccountPatterns,
+  subscribeToAccountPalettes,
 } from '../lib/account/accountRepo';
 
 export function useAccount() {
@@ -24,6 +26,20 @@ export function useAccount() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const unsubscribePatterns = subscribeToAccountPatterns();
+    const unsubscribePalettes = subscribeToAccountPalettes();
+
+    return () => {
+      unsubscribePatterns();
+      unsubscribePalettes();
+    };
+  }, [user]);
+
   const register = async (email: string, password: string) => {
     const createdUser = await createAccount(email, password);
 
@@ -36,10 +52,11 @@ export function useAccount() {
   const login = async (email: string, password: string) => {
     const signedInUser = await signIn(email, password);
 
+    // Download the account's existing cloud data first.
     await importAccountDataToLocal();
 
     return signedInUser;
-    };
+  };
 
   const logout = async () => {
     await logOut();
