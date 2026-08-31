@@ -146,6 +146,35 @@ export function WorkingView({
     setReplacingColor(null);
   };
 
+  const handleRemoveColor = async (colorName: string) => {
+    const confirmed = window.confirm(
+      `Remove all ${colorName} beads from this pattern?`,
+    );
+
+    if (!confirmed) return;
+
+    const cells: { row: number; col: number }[] = [];
+
+    pattern.cellColors.forEach((row, rowIndex) => {
+      row.forEach((cellColor, colIndex) => {
+        if (cellColor === colorName) {
+          cells.push({ row: rowIndex, col: colIndex });
+        }
+      });
+    });
+
+    if (cells.length === 0) return;
+
+    const updated = await setCellsColor(
+      pattern.id,
+      cells,
+      EMPTY_CELL,
+      palette,
+    );
+
+    syncSharedPattern(updated, palette);
+  };
+
   const toggleCellSelection = (row: number, col: number) => {
     const key = `${row}-${col}`;
     setSelectedCells((prev) => {
@@ -425,6 +454,15 @@ export function WorkingView({
                     >
                       Replace
                     </button>
+
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      aria-label={`Remove ${color.name}`}
+                      onClick={() => handleRemoveColor(color.name)}
+                    >
+                      Remove
+                    </button>
+
                   </div>
                   {isReplacing && (
                     <div className="swatch-picker" role="group" aria-label="Choose a similar color">
