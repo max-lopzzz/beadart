@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   createAccount,
@@ -15,22 +15,22 @@ import {
   subscribeToAccountPalettes,
 } from '../lib/account/accountRepo';
 
-/**
- * - 'offline': no account is signed in; data only lives on this device.
- * - 'connecting': signed in, waiting for the first snapshot from Firestore.
- * - 'live': both the pattern and palette listeners are attached and
- *   healthy — changes on any device will appear here in real time.
- * - 'error': a listener reported an error (e.g. the device lost network,
- *   or Firestore rejected a read). Sync has stopped until reconnected.
- */
-export type SyncStatus = 'offline' | 'connecting' | 'live' | 'error';
+export type SyncStatus =
+  | 'offline'
+  | 'connecting'
+  | 'live'
+  | 'error';
 
 export type AccountState = ReturnType<typeof useAccount>;
 
 export function useAccount() {
   const [user, setUser] = useState(() => getCurrentUser());
   const [loading, setLoading] = useState(true);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('offline');
+  const [syncStatus, setSyncStatus] =
+    useState<SyncStatus>('offline');
+
+  const patternsReadyRef = useRef(false);
+  const palettesReadyRef = useRef(false);
 
   useEffect(() => {
     return subscribeToAuthState((nextUser) => {
@@ -41,38 +41,48 @@ export function useAccount() {
 
   useEffect(() => {
     if (!user) {
+      patternsReadyRef.current = false;
+      palettesReadyRef.current = false;
       setSyncStatus('offline');
       return;
     }
 
     setSyncStatus('connecting');
 
-    let patternsReady = false;
-    let palettesReady = false;
+    patternsReadyRef.current = false;
+    palettesReadyRef.current = false;
 
     const handlePatternsReady = () => {
-      patternsReady = true;
-      setSyncStatus(palettesReady ? 'live' : 'connecting');
+      patternsReadyRef.current = true;
+
+      setSyncStatus(
+        palettesReadyRef.current ? 'live' : 'connecting',
+      );
     };
 
     const handlePalettesReady = () => {
-      palettesReady = true;
-      setSyncStatus(patternsReady ? 'live' : 'connecting');
+      palettesReadyRef.current = true;
+
+      setSyncStatus(
+        patternsReadyRef.current ? 'live' : 'connecting',
+      );
     };
 
     const handleError = () => {
       setSyncStatus('error');
     };
 
-    const unsubscribePatterns = subscribeToAccountPatterns(
-      handlePatternsReady,
-      handleError,
-    );
+    const unsubscribePatterns =
+      subscribeToAccountPatterns(
+        handlePatternsReady,
+        handleError,
+      );
 
-    const unsubscribePalettes = subscribeToAccountPalettes(
-      handlePalettesReady,
-      handleError,
-    );
+    const unsubscribePalettes =
+      subscribeToAccountPalettes(
+        handlePalettesReady,
+        handleError,
+      );
 
     return () => {
       unsubscribePatterns();
@@ -80,15 +90,31 @@ export function useAccount() {
     };
   }, [user]);
 
-  const register = async (email: string, password: string) => {
-    const createdUser = await createAccount(email, password);
+  const register = async (
+    email: string,
+    password: string,
+  ) => {
+    const createdUser = await createAccount(
+      email,
+      password,
+    );
+
     await migrateLocalDataToAccount();
+
     return createdUser;
   };
 
-  const login = async (email: string, password: string) => {
-    const signedInUser = await signIn(email, password);
+  const login = async (
+    email: string,
+    password: string,
+  ) => {
+    const signedInUser = await signIn(
+      email,
+      password,
+    );
+
     await syncLocalDataWithAccount();
+
     return signedInUser;
   };
 

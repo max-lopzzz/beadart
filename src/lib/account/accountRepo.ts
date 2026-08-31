@@ -354,7 +354,6 @@ export function subscribeToAccountPatterns(
   return onSnapshot(
     patternsCollection(user.uid),
     async (snapshot) => {
-
       const { savePattern, deletePattern } =
         await import('../storage/patternsRepo');
 
@@ -373,7 +372,9 @@ export function subscribeToAccountPatterns(
         }),
       );
 
-      window.dispatchEvent(new Event('beadart-patterns-updated'));
+      window.dispatchEvent(
+        new Event('beadart-patterns-updated'),
+      );
 
       onChange?.();
     },
