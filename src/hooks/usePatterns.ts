@@ -16,6 +16,11 @@ import {
   setShareSlug,
 } from '../lib/storage/patternsRepo';
 
+import {
+  deleteSyncedPattern,
+  syncPattern,
+} from '../lib/account/accountRepo';
+
 interface UsePatternsOptions {
   renderThumbnail?: typeof renderPatternToDataUrl;
 }
@@ -40,6 +45,7 @@ export function usePatterns({
   const addPattern = useCallback(
     async (pattern: Pattern) => {
       await savePattern(pattern);
+      await syncPattern(pattern);
       await refresh();
     },
     [refresh],
@@ -48,6 +54,7 @@ export function usePatterns({
   const removePattern = useCallback(
     async (id: string) => {
       await deletePattern(id);
+      await deleteSyncedPattern(id);
       await refresh();
     },
     [refresh],
@@ -59,7 +66,12 @@ export function usePatterns({
       colorName: string,
       completed: boolean,
     ) => {
-      await setColorCompleted(patternId, colorName, completed);
+      const updated = await setColorCompleted(
+        patternId,
+        colorName,
+        completed,
+      );
+      await syncPattern(updated);
       await refresh();
     },
     [refresh],
@@ -83,6 +95,7 @@ export function usePatterns({
       });
 
       await savePattern({ ...updated, thumbnail });
+      await syncPattern({ ...updated, thumbnail });
       await refresh();
 
       return { ...updated, thumbnail };
@@ -92,7 +105,8 @@ export function usePatterns({
 
   const renamePattern = useCallback(
     async (patternId: string, name: string) => {
-      await renamePatternInStorage(patternId, name);
+      const updated = await renamePatternInStorage(patternId, name);
+      await syncPattern(updated);
       await refresh();
     },
     [refresh],
@@ -100,7 +114,8 @@ export function usePatterns({
 
   const setShare = useCallback(
     async (patternId: string, shareSlug: string | null) => {
-      await setShareSlug(patternId, shareSlug);
+      const updated = await setShareSlug(patternId, shareSlug);
+      await syncPattern(updated);
       await refresh();
     },
     [refresh],
@@ -124,6 +139,7 @@ export function usePatterns({
       });
 
       await savePattern({ ...updated, thumbnail });
+      await syncPattern({ ...updated, thumbnail });
       await refresh();
 
       return { ...updated, thumbnail };
