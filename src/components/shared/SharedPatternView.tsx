@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+
 import { fetchSharedPattern } from '../../lib/sharing/shareRepo';
 import { SharedPatternSummary } from '../../types/sharedPattern';
 import { ProgressRing } from './Progress';
@@ -14,7 +15,9 @@ export function SharedPatternView({ slug }: { slug: string }) {
 
   useEffect(() => {
     let cancelled = false;
+
     setState({ status: 'loading' });
+
     fetchSharedPattern(slug)
       .then((summary) => {
         if (cancelled) return;
@@ -23,6 +26,7 @@ export function SharedPatternView({ slug }: { slug: string }) {
       .catch(() => {
         if (!cancelled) setState({ status: 'error' });
       });
+
     return () => {
       cancelled = true;
     };
@@ -57,24 +61,25 @@ export function SharedPatternView({ slug }: { slug: string }) {
   return (
     <div className="shared-view">
       <div className="surface shared-card">
-        <div className="shared-card-header">
-          {summary.thumbnail && (
-            <img
-              className="shared-card-thumb"
-              src={summary.thumbnail}
-              alt={summary.name}
-              width={64}
-              height={64}
-            />
-          )}
-          <div className="shared-card-heading">
-            <h1>{summary.name}</h1>
-            <div className="shared-card-progress">
-              <ProgressRing percent={summary.percent} size={40} thickness={4} />
-              <span>{summary.percent}% complete</span>
-            </div>
+        <div className="shared-card-heading">
+          <h1>{summary.name}</h1>
+
+          <div className="shared-card-progress">
+            <ProgressRing percent={summary.percent} size={40} thickness={4} />
+            <span>{summary.percent}% complete</span>
           </div>
         </div>
+
+        {summary.thumbnail && (
+          <div className="shared-pattern-preview">
+            <img
+              className="shared-pattern-thumb"
+              src={summary.thumbnail}
+              alt={`Preview of ${summary.name}`}
+            />
+          </div>
+        )}
+
         <ul className="shared-color-list">
           {summary.colors.map((color) => (
             <li key={color.name} data-done={color.done ? 'true' : 'false'}>
@@ -86,7 +91,9 @@ export function SharedPatternView({ slug }: { slug: string }) {
               <span className="shared-color-name">
                 {color.name} × {color.total}
               </span>
-              <span className="shared-color-status">{color.done ? 'done' : 'remaining'}</span>
+              <span className="shared-color-status">
+                {color.done ? 'done' : 'remaining'}
+              </span>
             </li>
           ))}
         </ul>

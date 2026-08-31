@@ -1245,6 +1245,27 @@ textarea {
   font-weight: 600;
 }
 
+.shared-pattern-preview {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-3);
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.shared-pattern-thumb {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
 /* Account screen — sign in / create account, and the "synced" status
    badge shown once an account is active. */
 
