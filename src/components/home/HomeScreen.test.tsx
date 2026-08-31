@@ -364,7 +364,9 @@ it('publishes the materials overview when share overview is clicked', async () =
     updatedAt: '2026-01-01T00:00:00.000Z',
   });
 
-  const randomUUID = vi.spyOn(crypto, 'randomUUID').mockReturnValue('overview-slug');
+  const randomUUID = vi
+    .spyOn(crypto, 'randomUUID')
+    .mockReturnValue('00000000-0000-4000-8000-000000000001');
 
   render(
     <HomeScreen
@@ -382,7 +384,7 @@ it('publishes the materials overview when share overview is clicked', async () =
 
   await waitFor(() =>
     expect(mockedPublishOverview).toHaveBeenCalledWith(
-      'overview-slug',
+      '00000000-0000-4000-8000-000000000001',
       expect.arrayContaining([
         expect.objectContaining({
           id: 'pattern-1',
@@ -394,7 +396,9 @@ it('publishes the materials overview when share overview is clicked', async () =
   );
 
   expect(screen.getByRole('button', { name: /stop sharing overview/i })).toBeInTheDocument();
-  expect(window.localStorage.getItem('beadart.overviewShareSlug')).toBe('overview-slug');
+  expect(window.localStorage.getItem('beadart.overviewShareSlug')).toBe(
+    '00000000-0000-4000-8000-000000000001',
+  );
 
   randomUUID.mockRestore();
 });
@@ -519,7 +523,9 @@ it('shows an error when publishing the overview fails', async () => {
 
   mockedPublishOverview.mockRejectedValueOnce(new Error('network down'));
 
-  const randomUUID = vi.spyOn(crypto, 'randomUUID').mockReturnValue('overview-slug');
+  const randomUUID = vi
+    .spyOn(crypto, 'randomUUID')
+    .mockReturnValue('00000000-0000-4000-8000-000000000001');
 
   render(
     <HomeScreen

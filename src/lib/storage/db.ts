@@ -38,12 +38,19 @@ export function getDb(): Promise<IDBPDatabase<BeadArtDB>> {
   return dbPromise;
 }
 
-export function resetDbForTests(): void {
-  // Close the underlying connection synchronously before dropping our
-  // references. `indexedDB.deleteDatabase` blocks indefinitely while any
-  // connection to the database remains open, which is exactly what tests
-  // do in `afterEach` — so without this close(), test cleanup hangs.
+export async function resetDbForTests(): Promise<void> {
   dbInstance?.close();
   dbInstance = null;
   dbPromise = null;
+
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => {
+      console.warn(`Database "${DB_NAME}" deletion is blocked.`);
+      resolve();
+    };
+  });
 }

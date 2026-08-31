@@ -36,6 +36,7 @@ function makePattern(overrides: Partial<Pattern> = {}): Pattern {
     paletteId: 'default-bead-palette',
     completedColors: [],
     thumbnail: 'data:image/png;base64,',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   };
 }

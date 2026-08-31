@@ -181,6 +181,7 @@ export function NewPatternWizard({
       paletteId: palette.id,
       completedColors: [],
       thumbnail: '',
+      updatedAt: new Date().toISOString(),
     };
     pattern.thumbnail = renderThumbnail(pattern, palette, { maxSize: 200 });
     await addPattern(pattern);
