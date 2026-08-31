@@ -10,7 +10,7 @@ import {
 
 import {
   migrateLocalDataToAccount,
-  importAccountDataToLocal,
+  syncLocalDataWithAccount,
   subscribeToAccountPatterns,
   subscribeToAccountPalettes,
 } from '../lib/account/accountRepo';
@@ -92,11 +92,11 @@ export function useAccount() {
   const login = async (email: string, password: string) => {
     const signedInUser = await signIn(email, password);
 
-    // Download the account's existing cloud data first.
-    await importAccountDataToLocal();
+    // Merge local and cloud data instead of blindly overwriting local data.
+    await syncLocalDataWithAccount();
 
     return signedInUser;
-  };
+    };
 
   const logout = async () => {
     await logOut();
