@@ -207,6 +207,9 @@ export async function syncLocalDataWithAccount(): Promise<void> {
     downloadAccountData(),
   ]);
 
+  console.log('[accountRepo] Local patterns:', localPatterns.length);
+  console.log('[accountRepo] Cloud patterns:', cloudData.patterns.length);
+
   const localPatternsById = new Map(
     localPatterns.map((pattern) => [pattern.id, pattern]),
   );
