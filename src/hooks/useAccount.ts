@@ -10,7 +10,7 @@ import {
 
 import {
   migrateLocalDataToAccount,
-  importAccountDataToLocal,
+  syncLocalDataWithAccount,
   subscribeToAccountPatterns,
   subscribeToAccountPalettes,
 } from '../lib/account/accountRepo';
@@ -24,6 +24,8 @@ import {
  *   or Firestore rejected a read). Sync has stopped until reconnected.
  */
 export type SyncStatus = 'offline' | 'connecting' | 'live' | 'error';
+
+export type AccountState = ReturnType<typeof useAccount>;
 
 export function useAccount() {
   const [user, setUser] = useState(() => getCurrentUser());
@@ -50,8 +52,6 @@ export function useAccount() {
 
     const handlePatternsReady = () => {
       patternsReady = true;
-      // A successful snapshot means the listener is healthy again, even
-      // if a previous snapshot on either collection had errored out.
       setSyncStatus(palettesReady ? 'live' : 'connecting');
     };
 
@@ -82,19 +82,13 @@ export function useAccount() {
 
   const register = async (email: string, password: string) => {
     const createdUser = await createAccount(email, password);
-
-    // The user's existing local data becomes their initial cloud data.
     await migrateLocalDataToAccount();
-
     return createdUser;
   };
 
   const login = async (email: string, password: string) => {
     const signedInUser = await signIn(email, password);
-
-    // Download the account's existing cloud data first.
-    await importAccountDataToLocal();
-
+    await syncLocalDataWithAccount();
     return signedInUser;
   };
 

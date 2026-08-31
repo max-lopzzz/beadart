@@ -10,34 +10,29 @@ import {
 import userEvent from '@testing-library/user-event';
 
 import { AccountScreen } from './AccountScreen';
+
+import type { User } from 'firebase/auth';
 import type { SyncStatus } from '../../hooks/useAccount';
 
-type MockUser = {
-  uid: string;
-  email: string | null;
-};
-
-const mockAccount: {
-  user: MockUser | null;
-  loading: boolean;
-  isAuthenticated: boolean;
-  syncStatus: SyncStatus;
-  register: ReturnType<typeof vi.fn>;
-  login: ReturnType<typeof vi.fn>;
-  logout: ReturnType<typeof vi.fn>;
-} = {
-  user: null,
+const mockAccount = vi.hoisted(() => ({
+  user: null as User | null,
   loading: false,
   isAuthenticated: false,
-  syncStatus: 'offline',
+  syncStatus: 'offline' as SyncStatus,
   register: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
-};
+}));
 
 vi.mock('../../hooks/useAccount', () => ({
   useAccount: () => mockAccount,
 }));
+
+const mockUser = (email: string): User =>
+  ({
+    uid: 'user-1',
+    email,
+  }) as User;
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -54,7 +49,12 @@ afterEach(() => {
 
 describe('AccountScreen', () => {
   it('explains that an account is optional', () => {
-    render(<AccountScreen onBack={vi.fn()} />);
+    render(
+      <AccountScreen
+        onBack={vi.fn()}
+        account={mockAccount}
+      />,
+    );
 
     expect(
       screen.getByText(/an account is optional/i),
@@ -74,7 +74,12 @@ describe('AccountScreen', () => {
   it('allows the user to switch to account creation', async () => {
     const user = userEvent.setup();
 
-    render(<AccountScreen onBack={vi.fn()} />);
+    render(
+      <AccountScreen
+        onBack={vi.fn()}
+        account={mockAccount}
+      />,
+    );
 
     await user.click(
       screen.getByRole('button', {
@@ -113,7 +118,12 @@ describe('AccountScreen', () => {
       email: 'test@example.com',
     });
 
-    render(<AccountScreen onBack={vi.fn()} />);
+    render(
+      <AccountScreen
+        onBack={vi.fn()}
+        account={mockAccount}
+      />,
+    );
 
     const form = screen.getByRole('form', {
       name: /sign in form/i,
@@ -151,7 +161,12 @@ describe('AccountScreen', () => {
       email: 'new@example.com',
     });
 
-    render(<AccountScreen onBack={vi.fn()} />);
+    render(
+      <AccountScreen
+        onBack={vi.fn()}
+        account={mockAccount}
+      />,
+    );
 
     await user.click(
       screen.getByRole('button', {
@@ -194,7 +209,12 @@ describe('AccountScreen', () => {
       new Error('Invalid email or password.'),
     );
 
-    render(<AccountScreen onBack={vi.fn()} />);
+    render(
+      <AccountScreen
+        onBack={vi.fn()}
+        account={mockAccount}
+      />,
+    );
 
     const form = screen.getByRole('form', {
       name: /sign in form/i,
@@ -227,7 +247,12 @@ describe('AccountScreen', () => {
     const user = userEvent.setup();
     const onBack = vi.fn();
 
-    render(<AccountScreen onBack={onBack} />);
+    render(
+      <AccountScreen
+        onBack={onBack}
+        account={mockAccount}
+      />,
+    );
 
     await user.click(
       screen.getByRole('button', {
@@ -239,14 +264,16 @@ describe('AccountScreen', () => {
   });
 
   it('shows the authenticated account', () => {
-    mockAccount.user = {
-      uid: 'user-1',
-      email: 'test@example.com',
-    };
+    mockAccount.user = mockUser('test@example.com');
 
     mockAccount.isAuthenticated = true;
 
-    render(<AccountScreen onBack={vi.fn()} />);
+    render(
+      <AccountScreen
+        onBack={vi.fn()}
+        account={mockAccount}
+      />,
+    );
 
     expect(
       screen.getByText('test@example.com'),
@@ -268,16 +295,18 @@ describe('AccountScreen', () => {
   it('signs out the authenticated user', async () => {
     const user = userEvent.setup();
 
-    mockAccount.user = {
-      uid: 'user-1',
-      email: 'test@example.com',
-    };
+    mockAccount.user = mockUser('test@example.com');
 
     mockAccount.isAuthenticated = true;
 
     mockAccount.logout.mockResolvedValue(undefined);
 
-    render(<AccountScreen onBack={vi.fn()} />);
+    render(
+      <AccountScreen
+        onBack={vi.fn()}
+        account={mockAccount}
+      />,
+    );
 
     await user.click(
       screen.getByRole('button', {
@@ -289,40 +318,46 @@ describe('AccountScreen', () => {
   });
 
   it('shows a live sync badge once both listeners are connected', () => {
-    mockAccount.user = {
-      uid: 'user-1',
-      email: 'test@example.com',
-    };
+    mockAccount.user = mockUser('test@example.com');
     mockAccount.isAuthenticated = true;
     mockAccount.syncStatus = 'live';
 
-    render(<AccountScreen onBack={vi.fn()} />);
+    render(
+      <AccountScreen
+        onBack={vi.fn()}
+        account={mockAccount}
+      />,
+    );
 
     expect(screen.getByText(/live sync active/i)).toBeInTheDocument();
   });
 
   it('shows a connecting badge while listeners are still attaching', () => {
-    mockAccount.user = {
-      uid: 'user-1',
-      email: 'test@example.com',
-    };
+    mockAccount.user = mockUser('test@example.com');
     mockAccount.isAuthenticated = true;
     mockAccount.syncStatus = 'connecting';
 
-    render(<AccountScreen onBack={vi.fn()} />);
+    render(
+      <AccountScreen
+        onBack={vi.fn()}
+        account={mockAccount}
+      />,
+    );
 
     expect(screen.getByText(/connecting/i)).toBeInTheDocument();
   });
 
   it('warns when sync has been interrupted', () => {
-    mockAccount.user = {
-      uid: 'user-1',
-      email: 'test@example.com',
-    };
+    mockAccount.user = mockUser('test@example.com');
     mockAccount.isAuthenticated = true;
     mockAccount.syncStatus = 'error';
 
-    render(<AccountScreen onBack={vi.fn()} />);
+    render(
+      <AccountScreen
+        onBack={vi.fn()}
+        account={mockAccount}
+      />,
+    );
 
     expect(
       screen.getByText(/sync interrupted/i),
@@ -330,14 +365,16 @@ describe('AccountScreen', () => {
   });
 
   it('shows no sync badge when offline', () => {
-    mockAccount.user = {
-      uid: 'user-1',
-      email: 'test@example.com',
-    };
+    mockAccount.user = mockUser('test@example.com');
     mockAccount.isAuthenticated = true;
     mockAccount.syncStatus = 'offline';
 
-    render(<AccountScreen onBack={vi.fn()} />);
+    render(
+      <AccountScreen
+        onBack={vi.fn()}
+        account={mockAccount}
+      />,
+    );
 
     expect(screen.queryByText(/live sync active/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/connecting/i)).not.toBeInTheDocument();

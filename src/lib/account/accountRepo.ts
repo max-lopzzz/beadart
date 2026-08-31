@@ -98,31 +98,6 @@ export async function uploadLocalData(): Promise<void> {
 }
 
 /**
- * Download all account data once.
- */
-export async function downloadAccountData(): Promise<{
-  patterns: Pattern[];
-  palettes: Palette[];
-}> {
-  const user = requireUser();
-
-  const [patternsSnapshot, palettesSnapshot] = await Promise.all([
-    getDocs(patternsCollection(user.uid)),
-    getDocs(palettesCollection(user.uid)),
-  ]);
-
-  return {
-    patterns: patternsSnapshot.docs.map((snapshot) =>
-      patternFromFirestore(snapshot.data() as FirestorePattern),
-    ),
-
-    palettes: palettesSnapshot.docs.map(
-      (snapshot) => snapshot.data() as Palette,
-    ),
-  };
-}
-
-/**
  * Sync one pattern to Firestore.
  */
 export async function syncPattern(pattern: Pattern): Promise<void> {
@@ -187,6 +162,160 @@ export async function deleteSyncedPalette(
   );
 }
 
+/**
+ * Download all account data once.
+ */
+export async function downloadAccountData(): Promise<{
+  patterns: Pattern[];
+  palettes: Palette[];
+}> {
+  const user = requireUser();
+
+  const [patternsSnapshot, palettesSnapshot] = await Promise.all([
+    getDocs(patternsCollection(user.uid)),
+    getDocs(palettesCollection(user.uid)),
+  ]);
+
+  return {
+    patterns: patternsSnapshot.docs.map((snapshot) =>
+      patternFromFirestore(snapshot.data() as FirestorePattern),
+    ),
+    palettes: palettesSnapshot.docs.map(
+      (snapshot) => snapshot.data() as Palette,
+    ),
+  };
+}
+
+/**
+ * Synchronize local and cloud account data.
+ *
+ * - Local-only data is uploaded.
+ * - Cloud-only data is downloaded.
+ * - When the same item exists in both places, the newest updatedAt wins.
+ */
+export async function syncLocalDataWithAccount(): Promise<void> {
+  const user = requireUser();
+
+  const { listPatterns } = await import('../storage/patternsRepo');
+  const { listPalettes } = await import('../storage/palettesRepo');
+  const { savePattern } = await import('../storage/patternsRepo');
+  const { savePalette } = await import('../storage/palettesRepo');
+
+  const [localPatterns, localPalettes, cloudData] = await Promise.all([
+    listPatterns(),
+    listPalettes(),
+    downloadAccountData(),
+  ]);
+
+  const localPatternsById = new Map(
+    localPatterns.map((pattern) => [pattern.id, pattern]),
+  );
+
+  const cloudPatternsById = new Map(
+    cloudData.patterns.map((pattern) => [pattern.id, pattern]),
+  );
+
+  const localPalettesById = new Map(
+    localPalettes.map((palette) => [palette.id, palette]),
+  );
+
+  const cloudPalettesById = new Map(
+    cloudData.palettes.map((palette) => [palette.id, palette]),
+  );
+
+  const db = getSharedPatternsDb();
+
+  const patternWrites: Promise<unknown>[] = [];
+  const paletteWrites: Promise<unknown>[] = [];
+
+  const allPatternIds = new Set([
+    ...localPatternsById.keys(),
+    ...cloudPatternsById.keys(),
+  ]);
+
+  for (const id of allPatternIds) {
+    const local = localPatternsById.get(id);
+    const cloud = cloudPatternsById.get(id);
+
+    if (local && !cloud) {
+      // Only exists locally → upload it.
+      patternWrites.push(
+        setDoc(
+          doc(db, 'users', user.uid, 'patterns', id),
+          patternToFirestore(local),
+        ),
+      );
+      continue;
+    }
+
+    if (!local && cloud) {
+      // Only exists in cloud → download it.
+      await savePattern(cloud);
+      continue;
+    }
+
+    if (!local || !cloud) {
+      continue;
+    }
+
+    // Exists in both places → newest version wins.
+    const localTime = Date.parse(local.updatedAt);
+    const cloudTime = Date.parse(cloud.updatedAt);
+
+    if (localTime >= cloudTime) {
+      patternWrites.push(
+        setDoc(
+          doc(db, 'users', user.uid, 'patterns', id),
+          patternToFirestore(local),
+        ),
+      );
+    } else {
+      await savePattern(cloud);
+    }
+  }
+
+  const allPaletteIds = new Set([
+    ...localPalettesById.keys(),
+    ...cloudPalettesById.keys(),
+  ]);
+
+  for (const id of allPaletteIds) {
+    const local = localPalettesById.get(id);
+    const cloud = cloudPalettesById.get(id);
+
+    if (local && !cloud) {
+      paletteWrites.push(
+        setDoc(
+          doc(db, 'users', user.uid, 'palettes', id),
+          local,
+        ),
+      );
+      continue;
+    }
+
+    if (!local && cloud) {
+      await savePalette(cloud);
+      continue;
+    }
+
+    if (!local || !cloud) {
+      continue;
+    }
+
+    // Palettes currently don't have updatedAt, so keep the cloud
+    // version when both exist.
+    await savePalette(cloud);
+  }
+
+  await Promise.all([...patternWrites, ...paletteWrites]);
+  
+  window.dispatchEvent(new Event('beadart-patterns-updated'));
+  window.dispatchEvent(new Event('beadart-palettes-updated'));
+}
+
+/**
+ * Upload local data when creating a new account.
+ */
 export async function migrateLocalDataToAccount(): Promise<void> {
   await uploadLocalData();
 }
