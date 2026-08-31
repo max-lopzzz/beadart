@@ -72,10 +72,20 @@ export function WorkingView({
     const recompute = () => {
       const rect = gridEl.getBoundingClientRect();
       const availableWidth = gridEl.clientWidth;
+
+      // In tests (and during the brief moment before layout is available),
+      // clientWidth can be 0. Keep the default cell size instead of
+      // collapsing the grid to the minimum size.
+      if (availableWidth <= 0) return;
+
       const availableHeight = Math.max(120, window.innerHeight - rect.top - 24);
       const size = Math.floor(
-        Math.min(availableWidth / pattern.cols, availableHeight / pattern.rows),
+        Math.min(
+          availableWidth / pattern.cols,
+          availableHeight / pattern.rows,
+        ),
       );
+
       setCellSize(Math.max(6, Math.min(28, size)));
     };
 
