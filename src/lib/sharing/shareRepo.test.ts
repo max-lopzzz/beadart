@@ -240,6 +240,7 @@ describe('fetchSharedOverview', () => {
         beadsPlaced: 6,
         beadsTotal: 8,
         percent: 75,
+        patterns: [],
         materials: [
           {
             name: 'Red',
@@ -263,6 +264,7 @@ describe('fetchSharedOverview', () => {
       beadsPlaced: 6,
       beadsTotal: 8,
       percent: 75,
+      patterns: [],
       materials: [
         {
           name: 'Red',
@@ -298,6 +300,7 @@ describe('fetchSharedOverview', () => {
         beadsPlaced: 6,
         beadsTotal: 8,
         percent: 75,
+        patterns: [],
         materials: [],
         updatedAt: '2026-08-30T12:00:00.000Z',
       }),
@@ -314,6 +317,7 @@ describe('fetchSharedOverview', () => {
         beadsPlaced: 0,
         beadsTotal: 4,
         percent: 0,
+        patterns: [],
         materials: [
           {
             name: 'Red',

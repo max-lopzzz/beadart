@@ -5,7 +5,11 @@ import { getSharedPatternsDb } from './firebaseClient';
 import { Pattern } from '../../types/pattern';
 import { Palette } from '../../types/palette';
 import { SharedPatternSummary, SharedColorProgress } from '../../types/sharedPattern';
-import { SharedOverviewSummary, SharedOverviewMaterial } from '../../types/sharedOverview';
+import {
+  SharedOverviewSummary,
+  SharedOverviewMaterial,
+  SharedOverviewPattern,
+} from '../../types/sharedOverview';
 
 import { colorCounts, completionPercent } from '../pattern/patternStats';
 import { aggregateColorTotals } from '../pattern/materialsSummary';
@@ -76,6 +80,22 @@ function isSharedOverviewMaterial(value: unknown): value is SharedOverviewMateri
   );
 }
 
+function isSharedOverviewPattern(
+  value: unknown,
+): value is SharedOverviewPattern {
+  if (!isRecord(value)) return false;
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.name === 'string' &&
+    typeof value.thumbnail === 'string' &&
+    typeof value.percent === 'number' &&
+    Number.isFinite(value.percent) &&
+    value.percent >= 0 &&
+    value.percent <= 100
+  );
+}
+
 function parseSharedOverviewSummary(value: unknown): SharedOverviewSummary | null {
   if (!isRecord(value)) return null;
 
@@ -96,6 +116,8 @@ function parseSharedOverviewSummary(value: unknown): SharedOverviewSummary | nul
     value.percent > 100 ||
     !Array.isArray(value.materials) ||
     !value.materials.every(isSharedOverviewMaterial) ||
+    !Array.isArray(value.patterns) ||
+    !value.patterns.every(isSharedOverviewPattern) ||
     typeof value.updatedAt !== 'string'
   ) {
     return null;
@@ -107,6 +129,7 @@ function parseSharedOverviewSummary(value: unknown): SharedOverviewSummary | nul
     beadsTotal: value.beadsTotal,
     percent: value.percent,
     materials: value.materials,
+    patterns: value.patterns,
     updatedAt: value.updatedAt,
   };
 }
@@ -184,6 +207,15 @@ export function buildOverviewSummary(
       hex: m.hex,
       total: m.total,
       remaining: m.incomplete,
+    })),
+    patterns: patterns.map((pattern) => ({
+      id: pattern.id,
+      name: pattern.name,
+      thumbnail: pattern.thumbnail,
+      percent: (() => {
+        const palette = palettesById.get(pattern.paletteId);
+        return palette ? completionPercent(pattern, palette) : 0;
+      })(),
     })),
     updatedAt: new Date().toISOString(),
   };

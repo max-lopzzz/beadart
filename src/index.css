@@ -1266,6 +1266,48 @@ textarea {
   image-rendering: pixelated;
 }
 
+.shared-pattern-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.shared-pattern-item {
+  min-width: 0;
+}
+
+.shared-pattern-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.shared-pattern-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-1);
+}
+
+.shared-pattern-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shared-pattern-percent {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+}
+
 /* Account screen — sign in / create account, and the "synced" status
    badge shown once an account is active. */
 

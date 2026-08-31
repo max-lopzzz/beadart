@@ -70,6 +70,25 @@ export function SharedOverviewView({ slug }: { slug: string }) {
             </div>
           </div>
         </div>
+        {summary.patterns.length > 0 && (
+          <div className="shared-pattern-grid">
+            {summary.patterns.map((pattern) => (
+              <div key={pattern.id} className="shared-pattern-item">
+                <img
+                  src={pattern.thumbnail}
+                  alt={pattern.name}
+                  className="shared-pattern-thumb"
+                />
+                <div className="shared-pattern-info">
+                  <span className="shared-pattern-name">{pattern.name}</span>
+                  <span className="shared-pattern-percent">
+                    {pattern.percent}% complete
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {summary.materials.length > 0 && (
           <ul className="shared-color-list">
             {summary.materials.map((color) => (

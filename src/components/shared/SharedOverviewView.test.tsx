@@ -23,6 +23,7 @@ describe('SharedOverviewView', () => {
       beadsPlaced: 6,
       beadsTotal: 8,
       percent: 75,
+      patterns: [],
       materials: [
         {
           name: 'Blue',
@@ -59,6 +60,7 @@ describe('SharedOverviewView', () => {
       beadsPlaced: 4,
       beadsTotal: 4,
       percent: 100,
+      patterns: [],
       materials: [
         {
           name: 'Red',
@@ -105,6 +107,7 @@ describe('SharedOverviewView', () => {
       beadsPlaced: 0,
       beadsTotal: 0,
       percent: 100,
+      patterns: [],
       materials: [],
       updatedAt: '2026-08-02T00:00:00.000Z',
     });
