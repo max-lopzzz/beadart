@@ -1,17 +1,52 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+
 import { resetDbForTests } from '../../lib/storage/db';
 import { savePalette } from '../../lib/storage/palettesRepo';
 import { savePattern } from '../../lib/storage/patternsRepo';
 import { defaultPalette } from '../../lib/palette/defaultPalette';
 import { HomeScreen } from './HomeScreen';
 
+vi.mock('../../lib/sharing/config', () => ({
+  isSharingConfigured: vi.fn(),
+}));
+
+vi.mock('../../lib/sharing/shareRepo', () => ({
+  publishOverview: vi.fn(),
+  unpublishOverview: vi.fn(),
+}));
+
+import { isSharingConfigured } from '../../lib/sharing/config';
+import { publishOverview, unpublishOverview } from '../../lib/sharing/shareRepo';
+
+const mockedIsSharingConfigured = vi.mocked(isSharingConfigured);
+const mockedPublishOverview = vi.mocked(publishOverview);
+const mockedUnpublishOverview = vi.mocked(unpublishOverview);
+
+beforeEach(() => {
+  mockedIsSharingConfigured.mockReturnValue(true);
+
+  if (!navigator.clipboard) {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+  }
+});
+
 afterEach(async () => {
+  vi.restoreAllMocks();
+
   resetDbForTests();
+
   window.localStorage.removeItem('beadart.overviewShareSlug');
+
   await new Promise<void>((resolve, reject) => {
     const req = indexedDB.deleteDatabase('beadart');
+
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
@@ -41,6 +76,7 @@ describe('HomeScreen', () => {
       paletteId: defaultPalette.id,
       completedColors: [],
       thumbnail: '',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     });
     await savePattern({
       id: 'pattern-2',
@@ -52,6 +88,7 @@ describe('HomeScreen', () => {
       paletteId: defaultPalette.id,
       completedColors: [colorA],
       thumbnail: '',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     });
 
     render(<HomeScreen onOpenPattern={vi.fn()} onNewPattern={vi.fn()} onManagePalettes={vi.fn()} />);
@@ -66,25 +103,45 @@ describe('HomeScreen', () => {
   });
 
   it('shows the share-overview button disabled with a setup hint when sharing is not configured', async () => {
-    await savePalette(defaultPalette);
-    await savePattern({
-      id: 'pattern-1',
-      name: 'My First Pattern',
-      createdAt: '2026-08-02T00:00:00.000Z',
-      rows: 1,
-      cols: 1,
-      cellColors: [[defaultPalette.colors[0].name]],
-      paletteId: defaultPalette.id,
-      completedColors: [],
-      thumbnail: '',
-    });
+  mockedIsSharingConfigured.mockReturnValue(false);
 
-    render(<HomeScreen onOpenPattern={vi.fn()} onNewPattern={vi.fn()} onManagePalettes={vi.fn()} />);
-    await waitFor(() => expect(screen.getByText(/materials overview/i)).toBeInTheDocument());
+  window.localStorage.removeItem('beadart.overviewShareSlug');
 
-    expect(screen.getByRole('button', { name: /^share overview$/i })).toBeDisabled();
-    expect(screen.getAllByText(/set up sharing \(see readme\)/i).length).toBeGreaterThan(0);
+  await savePalette(defaultPalette);
+
+  await savePattern({
+    id: 'pattern-1',
+    name: 'My First Pattern',
+    createdAt: '2026-08-02T00:00:00.000Z',
+    rows: 1,
+    cols: 1,
+    cellColors: [[defaultPalette.colors[0].name]],
+    paletteId: defaultPalette.id,
+    completedColors: [],
+    thumbnail: '',
+    updatedAt: '2026-01-01T00:00:00.000Z',
   });
+
+  render(
+    <HomeScreen
+      onOpenPattern={vi.fn()}
+      onNewPattern={vi.fn()}
+      onManagePalettes={vi.fn()}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByText(/materials overview/i)).toBeInTheDocument(),
+  );
+
+  expect(
+    screen.getByRole('button', { name: /^share overview$/i }),
+  ).toBeDisabled();
+
+  expect(
+    screen.getAllByText(/set up sharing \(see readme\)/i).length,
+  ).toBeGreaterThan(0);
+});
 
   it('filters the pattern grid to patterns using a clicked material color', async () => {
     await savePalette(defaultPalette);
@@ -100,6 +157,7 @@ describe('HomeScreen', () => {
       paletteId: defaultPalette.id,
       completedColors: [],
       thumbnail: '',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     });
     await savePattern({
       id: 'pattern-2',
@@ -111,6 +169,7 @@ describe('HomeScreen', () => {
       paletteId: defaultPalette.id,
       completedColors: [],
       thumbnail: '',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     });
 
     render(<HomeScreen onOpenPattern={vi.fn()} onNewPattern={vi.fn()} onManagePalettes={vi.fn()} />);
@@ -137,6 +196,7 @@ describe('HomeScreen', () => {
       paletteId: defaultPalette.id,
       completedColors: [],
       thumbnail: '',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     });
     await savePattern({
       id: 'pattern-2',
@@ -148,6 +208,7 @@ describe('HomeScreen', () => {
       paletteId: defaultPalette.id,
       completedColors: [],
       thumbnail: '',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     });
 
     render(<HomeScreen onOpenPattern={vi.fn()} onNewPattern={vi.fn()} onManagePalettes={vi.fn()} />);
@@ -173,6 +234,7 @@ describe('HomeScreen', () => {
       paletteId: defaultPalette.id,
       completedColors: [defaultPalette.colors[0].name],
       thumbnail: '',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     });
 
     render(<HomeScreen onOpenPattern={vi.fn()} onNewPattern={vi.fn()} onManagePalettes={vi.fn()} />);
@@ -193,6 +255,7 @@ describe('HomeScreen', () => {
       paletteId: defaultPalette.id,
       completedColors: [],
       thumbnail: '',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     });
 
     const onOpenPattern = vi.fn();
@@ -217,6 +280,7 @@ describe('HomeScreen', () => {
       paletteId: defaultPalette.id,
       completedColors: [],
       thumbnail: '',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     });
 
     const onOpenPattern = vi.fn();
@@ -246,6 +310,7 @@ describe('HomeScreen', () => {
       paletteId: defaultPalette.id,
       completedColors: [],
       thumbnail: '',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     });
 
     render(<HomeScreen onOpenPattern={vi.fn()} onNewPattern={vi.fn()} onManagePalettes={vi.fn()} />);
@@ -279,4 +344,204 @@ describe('HomeScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: /manage palettes/i }));
     expect(onManagePalettes).toHaveBeenCalled();
   });
+});
+
+it('publishes the materials overview when share overview is clicked', async () => {
+  await savePalette(defaultPalette);
+
+  const color = defaultPalette.colors[0].name;
+
+  await savePattern({
+    id: 'pattern-1',
+    name: 'My First Pattern',
+    createdAt: '2026-08-02T00:00:00.000Z',
+    rows: 1,
+    cols: 1,
+    cellColors: [[color]],
+    paletteId: defaultPalette.id,
+    completedColors: [],
+    thumbnail: '',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  });
+
+  const randomUUID = vi.spyOn(crypto, 'randomUUID').mockReturnValue('overview-slug');
+
+  render(
+    <HomeScreen
+      onOpenPattern={vi.fn()}
+      onNewPattern={vi.fn()}
+      onManagePalettes={vi.fn()}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: /^share overview$/i })).toBeInTheDocument(),
+  );
+
+  await userEvent.click(screen.getByRole('button', { name: /^share overview$/i }));
+
+  await waitFor(() =>
+    expect(mockedPublishOverview).toHaveBeenCalledWith(
+      'overview-slug',
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'pattern-1',
+          name: 'My First Pattern',
+        }),
+      ]),
+      expect.any(Map),
+    ),
+  );
+
+  expect(screen.getByRole('button', { name: /stop sharing overview/i })).toBeInTheDocument();
+  expect(window.localStorage.getItem('beadart.overviewShareSlug')).toBe('overview-slug');
+
+  randomUUID.mockRestore();
+});
+
+it('copies the overview share link', async () => {
+  await savePalette(defaultPalette);
+
+  const color = defaultPalette.colors[0].name;
+
+  await savePattern({
+    id: 'pattern-1',
+    name: 'My First Pattern',
+    createdAt: '2026-08-02T00:00:00.000Z',
+    rows: 1,
+    cols: 1,
+    cellColors: [[color]],
+    paletteId: defaultPalette.id,
+    completedColors: [],
+    thumbnail: '',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  });
+
+  window.localStorage.setItem(
+    'beadart.overviewShareSlug',
+    'overview-slug',
+  );
+
+  const writeText = vi
+    .spyOn(navigator.clipboard, 'writeText')
+    .mockResolvedValue(undefined);
+
+  render(
+    <HomeScreen
+      onOpenPattern={vi.fn()}
+      onNewPattern={vi.fn()}
+      onManagePalettes={vi.fn()}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: /copy link/i }),
+    ).toBeInTheDocument(),
+  );
+
+  await userEvent.click(
+    screen.getByRole('button', { name: /copy link/i }),
+  );
+
+  expect(writeText).toHaveBeenCalledWith(
+    `${window.location.origin}${window.location.pathname}?overview=overview-slug`,
+  );
+
+  expect(
+    screen.getByRole('button', { name: /copied!/i }),
+  ).toBeInTheDocument();
+});
+
+it('stops sharing the materials overview', async () => {
+  await savePalette(defaultPalette);
+
+  const color = defaultPalette.colors[0].name;
+
+  await savePattern({
+    id: 'pattern-1',
+    name: 'My First Pattern',
+    createdAt: '2026-08-02T00:00:00.000Z',
+    rows: 1,
+    cols: 1,
+    cellColors: [[color]],
+    paletteId: defaultPalette.id,
+    completedColors: [],
+    thumbnail: '',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  });
+
+  window.localStorage.setItem('beadart.overviewShareSlug', 'overview-slug');
+
+  render(
+    <HomeScreen
+      onOpenPattern={vi.fn()}
+      onNewPattern={vi.fn()}
+      onManagePalettes={vi.fn()}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: /stop sharing overview/i }),
+    ).toBeInTheDocument(),
+  );
+
+  await userEvent.click(
+    screen.getByRole('button', { name: /stop sharing overview/i }),
+  );
+
+  await waitFor(() =>
+    expect(mockedUnpublishOverview).toHaveBeenCalledWith('overview-slug'),
+  );
+
+  expect(window.localStorage.getItem('beadart.overviewShareSlug')).toBeNull();
+  expect(screen.getByRole('button', { name: /^share overview$/i })).toBeInTheDocument();
+});
+
+it('shows an error when publishing the overview fails', async () => {
+  await savePalette(defaultPalette);
+
+  const color = defaultPalette.colors[0].name;
+
+  await savePattern({
+    id: 'pattern-1',
+    name: 'My First Pattern',
+    createdAt: '2026-08-02T00:00:00.000Z',
+    rows: 1,
+    cols: 1,
+    cellColors: [[color]],
+    paletteId: defaultPalette.id,
+    completedColors: [],
+    thumbnail: '',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  });
+
+  mockedPublishOverview.mockRejectedValueOnce(new Error('network down'));
+
+  const randomUUID = vi.spyOn(crypto, 'randomUUID').mockReturnValue('overview-slug');
+
+  render(
+    <HomeScreen
+      onOpenPattern={vi.fn()}
+      onNewPattern={vi.fn()}
+      onManagePalettes={vi.fn()}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: /^share overview$/i })).toBeInTheDocument(),
+  );
+
+  await userEvent.click(screen.getByRole('button', { name: /^share overview$/i }));
+
+  await waitFor(() =>
+    expect(
+      screen.getByText(/could not share the overview/i),
+    ).toBeInTheDocument(),
+  );
+
+  expect(window.localStorage.getItem('beadart.overviewShareSlug')).toBeNull();
+
+  randomUUID.mockRestore();
 });
