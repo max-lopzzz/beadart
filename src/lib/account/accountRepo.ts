@@ -30,6 +30,41 @@ function palettesCollection(uid: string) {
   return collection(getSharedPatternsDb(), 'users', uid, 'palettes');
 }
 
+/**
+ * Firestore does not support nested arrays.
+ *
+ * Pattern.cellColors is string[][] locally, so we flatten it before
+ * storing it in Firestore. rows/cols allow us to reconstruct the
+ * original matrix when downloading the pattern.
+ */
+type FirestorePattern = Omit<Pattern, 'cellColors'> & {
+  cellColors: string[];
+};
+
+function patternToFirestore(pattern: Pattern): FirestorePattern {
+  return {
+    ...pattern,
+    cellColors: pattern.cellColors.flat(),
+  };
+}
+
+function patternFromFirestore(data: FirestorePattern): Pattern {
+  const { cellColors, rows, cols, ...rest } = data;
+
+  const matrix: string[][] = [];
+
+  for (let row = 0; row < rows; row += 1) {
+    matrix.push(cellColors.slice(row * cols, (row + 1) * cols));
+  }
+
+  return {
+    ...rest,
+    rows,
+    cols,
+    cellColors: matrix,
+  };
+}
+
 export async function uploadLocalData(): Promise<void> {
   const user = requireUser();
 
@@ -45,7 +80,7 @@ export async function uploadLocalData(): Promise<void> {
     ...patterns.map((pattern) =>
       setDoc(
         doc(db, 'users', user.uid, 'patterns', pattern.id),
-        pattern,
+        patternToFirestore(pattern),
       ),
     ),
 
@@ -70,8 +105,13 @@ export async function downloadAccountData(): Promise<{
   ]);
 
   return {
-    patterns: patternsSnapshot.docs.map((snapshot) => snapshot.data() as Pattern),
-    palettes: palettesSnapshot.docs.map((snapshot) => snapshot.data() as Palette),
+    patterns: patternsSnapshot.docs.map((snapshot) =>
+      patternFromFirestore(snapshot.data() as FirestorePattern),
+    ),
+
+    palettes: palettesSnapshot.docs.map(
+      (snapshot) => snapshot.data() as Palette,
+    ),
   };
 }
 
@@ -86,11 +126,13 @@ export async function syncPattern(pattern: Pattern): Promise<void> {
 
   await setDoc(
     doc(db, 'users', user.uid, 'patterns', pattern.id),
-    pattern,
+    patternToFirestore(pattern),
   );
 }
 
-export async function deleteSyncedPattern(patternId: string): Promise<void> {
+export async function deleteSyncedPattern(
+  patternId: string,
+): Promise<void> {
   const user = getCurrentUser();
 
   if (!user) {
@@ -119,7 +161,9 @@ export async function syncPalette(palette: Palette): Promise<void> {
   );
 }
 
-export async function deleteSyncedPalette(paletteId: string): Promise<void> {
+export async function deleteSyncedPalette(
+  paletteId: string,
+): Promise<void> {
   const user = getCurrentUser();
 
   if (!user) {
