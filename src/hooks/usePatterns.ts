@@ -71,6 +71,7 @@ export function usePatterns({
         colorName,
         completed,
       );
+
       await syncPattern(updated);
       await refresh();
     },
@@ -94,11 +95,16 @@ export function usePatterns({
         maxSize: 200,
       });
 
-      await savePattern({ ...updated, thumbnail });
-      await syncPattern({ ...updated, thumbnail });
+      const finalPattern = {
+        ...updated,
+        thumbnail,
+      };
+
+      await savePattern(finalPattern);
+      await syncPattern(finalPattern);
       await refresh();
 
-      return { ...updated, thumbnail };
+      return finalPattern;
     },
     [refresh, renderThumbnail],
   );
@@ -106,6 +112,7 @@ export function usePatterns({
   const renamePattern = useCallback(
     async (patternId: string, name: string) => {
       const updated = await renamePatternInStorage(patternId, name);
+
       await syncPattern(updated);
       await refresh();
     },
@@ -115,6 +122,7 @@ export function usePatterns({
   const setShare = useCallback(
     async (patternId: string, shareSlug: string | null) => {
       const updated = await setShareSlug(patternId, shareSlug);
+
       await syncPattern(updated);
       await refresh();
     },
@@ -138,11 +146,16 @@ export function usePatterns({
         maxSize: 200,
       });
 
-      await savePattern({ ...updated, thumbnail });
-      await syncPattern({ ...updated, thumbnail });
+      const finalPattern = {
+        ...updated,
+        thumbnail,
+      };
+
+      await savePattern(finalPattern);
+      await syncPattern(finalPattern);
       await refresh();
 
-      return { ...updated, thumbnail };
+      return finalPattern;
     },
     [refresh, renderThumbnail],
   );
