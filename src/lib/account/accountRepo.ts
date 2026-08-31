@@ -43,8 +43,11 @@ type FirestorePattern = Omit<Pattern, 'cellColors'> & {
 };
 
 function patternToFirestore(pattern: Pattern): FirestorePattern {
+  const { shareSlug, ...rest } = pattern;
+
   return {
-    ...pattern,
+    ...rest,
+    ...(shareSlug !== undefined ? { shareSlug } : {}),
     cellColors: pattern.cellColors.flat(),
   };
 }
