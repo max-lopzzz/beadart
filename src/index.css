@@ -1177,16 +1177,40 @@ textarea {
 }
 
 .shared-view {
+  width: 100%;
+  max-width: none;
   padding: var(--space-4);
-  max-width: 420px;
   margin: 0 auto;
 }
 
 .shared-card {
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
+  width: 100%;
+  container-type: inline-size;
+}
+
+.shared-pattern-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+@container (min-width: 500px) {
+  .shared-pattern-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 700px) {
+  .shared-pattern-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 900px) {
+  .shared-pattern-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 
 .shared-card-header {
@@ -1268,7 +1292,7 @@ textarea {
 
 .shared-pattern-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
   margin-top: var(--space-4);
 }
