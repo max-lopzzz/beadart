@@ -3,6 +3,7 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  onSnapshot,
   setDoc,
 } from 'firebase/firestore';
 
@@ -30,6 +31,44 @@ function palettesCollection(uid: string) {
   return collection(getSharedPatternsDb(), 'users', uid, 'palettes');
 }
 
+/**
+ * Firestore does not support nested arrays.
+ *
+ * Pattern.cellColors is string[][] locally, so we flatten it before
+ * storing it in Firestore. rows/cols allow us to reconstruct the
+ * original matrix when downloading the pattern.
+ */
+type FirestorePattern = Omit<Pattern, 'cellColors'> & {
+  cellColors: string[];
+};
+
+function patternToFirestore(pattern: Pattern): FirestorePattern {
+  return {
+    ...pattern,
+    cellColors: pattern.cellColors.flat(),
+  };
+}
+
+function patternFromFirestore(data: FirestorePattern): Pattern {
+  const { cellColors, rows, cols, ...rest } = data;
+
+  const matrix: string[][] = [];
+
+  for (let row = 0; row < rows; row += 1) {
+    matrix.push(cellColors.slice(row * cols, (row + 1) * cols));
+  }
+
+  return {
+    ...rest,
+    rows,
+    cols,
+    cellColors: matrix,
+  };
+}
+
+/**
+ * Upload all local patterns and palettes to the authenticated account.
+ */
 export async function uploadLocalData(): Promise<void> {
   const user = requireUser();
 
@@ -45,7 +84,7 @@ export async function uploadLocalData(): Promise<void> {
     ...patterns.map((pattern) =>
       setDoc(
         doc(db, 'users', user.uid, 'patterns', pattern.id),
-        pattern,
+        patternToFirestore(pattern),
       ),
     ),
 
@@ -58,6 +97,9 @@ export async function uploadLocalData(): Promise<void> {
   ]);
 }
 
+/**
+ * Download all account data once.
+ */
 export async function downloadAccountData(): Promise<{
   patterns: Pattern[];
   palettes: Palette[];
@@ -70,11 +112,19 @@ export async function downloadAccountData(): Promise<{
   ]);
 
   return {
-    patterns: patternsSnapshot.docs.map((snapshot) => snapshot.data() as Pattern),
-    palettes: palettesSnapshot.docs.map((snapshot) => snapshot.data() as Palette),
+    patterns: patternsSnapshot.docs.map((snapshot) =>
+      patternFromFirestore(snapshot.data() as FirestorePattern),
+    ),
+
+    palettes: palettesSnapshot.docs.map(
+      (snapshot) => snapshot.data() as Palette,
+    ),
   };
 }
 
+/**
+ * Sync one pattern to Firestore.
+ */
 export async function syncPattern(pattern: Pattern): Promise<void> {
   const user = getCurrentUser();
 
@@ -86,11 +136,13 @@ export async function syncPattern(pattern: Pattern): Promise<void> {
 
   await setDoc(
     doc(db, 'users', user.uid, 'patterns', pattern.id),
-    pattern,
+    patternToFirestore(pattern),
   );
 }
 
-export async function deleteSyncedPattern(patternId: string): Promise<void> {
+export async function deleteSyncedPattern(
+  patternId: string,
+): Promise<void> {
   const user = getCurrentUser();
 
   if (!user) {
@@ -119,7 +171,9 @@ export async function syncPalette(palette: Palette): Promise<void> {
   );
 }
 
-export async function deleteSyncedPalette(paletteId: string): Promise<void> {
+export async function deleteSyncedPalette(
+  paletteId: string,
+): Promise<void> {
   const user = getCurrentUser();
 
   if (!user) {
@@ -137,6 +191,9 @@ export async function migrateLocalDataToAccount(): Promise<void> {
   await uploadLocalData();
 }
 
+/**
+ * Import all cloud data into IndexedDB.
+ */
 export async function importAccountDataToLocal(): Promise<void> {
   const { patterns, palettes } = await downloadAccountData();
 
@@ -147,4 +204,103 @@ export async function importAccountDataToLocal(): Promise<void> {
     ...patterns.map((pattern) => savePattern(pattern)),
     ...palettes.map((palette) => savePalette(palette)),
   ]);
+}
+
+/**
+ * Listen for real-time pattern changes in Firestore.
+ *
+ * Every remote change is mirrored into local IndexedDB and then a
+ * browser event is dispatched so React hooks can refresh themselves.
+ */
+export function subscribeToAccountPatterns(
+  onChange?: () => void,
+  onError?: (error: Error) => void,
+): () => void {
+  const user = getCurrentUser();
+
+  if (!user) {
+    return () => {};
+  }
+
+  return onSnapshot(
+    patternsCollection(user.uid),
+    async (snapshot) => {
+
+      const { savePattern, deletePattern } =
+        await import('../storage/patternsRepo');
+
+      await Promise.all(
+        snapshot.docChanges().map(async (change) => {
+          if (change.type === 'removed') {
+            await deletePattern(change.doc.id);
+            return;
+          }
+
+          const pattern = patternFromFirestore(
+            change.doc.data() as FirestorePattern,
+          );
+
+          await savePattern(pattern);
+        }),
+      );
+
+      window.dispatchEvent(new Event('beadart-patterns-updated'));
+
+      onChange?.();
+    },
+    (error) => {
+      console.error(
+        '[accountRepo] Pattern subscription failed:',
+        error,
+      );
+
+      onError?.(error);
+    },
+  );
+}
+
+/**
+ * Listen for real-time palette changes in Firestore.
+ */
+export function subscribeToAccountPalettes(
+  onChange?: () => void,
+  onError?: (error: Error) => void,
+): () => void {
+  const user = getCurrentUser();
+
+  if (!user) {
+    return () => {};
+  }
+
+  return onSnapshot(
+    palettesCollection(user.uid),
+    async (snapshot) => {
+      const { savePalette, deletePalette } =
+        await import('../storage/palettesRepo');
+
+      await Promise.all(
+        snapshot.docChanges().map(async (change) => {
+          if (change.type === 'removed') {
+            await deletePalette(change.doc.id);
+            return;
+          }
+
+          const palette = change.doc.data() as Palette;
+          await savePalette(palette);
+        }),
+      );
+
+      window.dispatchEvent(new Event('beadart-palettes-updated'));
+
+      onChange?.();
+    },
+    (error) => {
+      console.error(
+        '[accountRepo] Palette subscription failed:',
+        error,
+      );
+
+      onError?.(error);
+    },
+  );
 }

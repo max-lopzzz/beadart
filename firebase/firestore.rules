@@ -1,27 +1,29 @@
-// Bead Art Helper: progress sharing
-//
-// One public collection holding a read-only summary of each shared pattern
-// (name, thumbnail, completion %, per-color checklist), keyed by a random
-// slug. There is no user auth in this app, so the slug is an unguessable
-// capability token rather than an access-controlled resource: anyone who
-// has (or guesses) a slug can read, overwrite, or delete that document.
-// Because `allow read` here applies to both direct reads and collection
-// queries, the whole collection is also technically listable by anyone
-// with the app's Firebase config (which ships in the client bundle) if
-// they issue a raw query rather than a get-by-id. That's an acceptable
-// trade-off for a personal hobby-progress tracker with no sensitive data
-// — don't reuse this ruleset for anything where that matters.
-
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
     match /sharedPatterns/{slug} {
       allow read, write: if true;
     }
-    // Same model as sharedPatterns, for the single "share everything"
-    // overview card (patterns count, beads placed, materials remaining).
+
     match /sharedOverview/{slug} {
       allow read, write: if true;
+    }
+
+    match /users/{userId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == userId;
+
+      match /patterns/{patternId} {
+        allow read, write: if request.auth != null
+          && request.auth.uid == userId;
+      }
+
+      match /palettes/{paletteId} {
+        allow read, write: if request.auth != null
+          && request.auth.uid == userId;
+      }
     }
   }
 }

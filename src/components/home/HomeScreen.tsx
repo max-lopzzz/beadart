@@ -234,7 +234,7 @@ export function HomeScreen({
           <button className="btn btn-primary" onClick={onNewPattern}>
             + New Pattern
           </button>
-          <button type="button" onClick={onAccount}>
+          <button type="button" className="btn btn-secondary" onClick={onAccount}>
             Account
           </button>
         </div>

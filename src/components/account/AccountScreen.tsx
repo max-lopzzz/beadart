@@ -1,9 +1,29 @@
 import { FormEvent, useState } from 'react';
 
-import { useAccount } from '../../hooks/useAccount';
+import { SyncStatus, useAccount } from '../../hooks/useAccount';
 
 interface AccountScreenProps {
   onBack: () => void;
+}
+
+const SYNC_STATUS_LABEL: Record<SyncStatus, string> = {
+  offline: 'Not synced',
+  connecting: 'Connecting…',
+  live: 'Live sync active',
+  error: 'Sync interrupted — check your connection',
+};
+
+function SyncBadge({ status }: { status: SyncStatus }) {
+  if (status === 'offline') {
+    return null;
+  }
+
+  return (
+    <p className="sync-badge" data-status={status} role="status">
+      <span className="sync-dot" aria-hidden="true" />
+      {SYNC_STATUS_LABEL[status]}
+    </p>
+  );
 }
 
 export function AccountScreen({ onBack }: AccountScreenProps) {
@@ -11,6 +31,7 @@ export function AccountScreen({ onBack }: AccountScreenProps) {
     user,
     loading,
     isAuthenticated,
+    syncStatus = 'offline',
     register,
     login,
     logout,
@@ -58,7 +79,7 @@ export function AccountScreen({ onBack }: AccountScreenProps) {
 
   if (loading) {
     return (
-      <div className="container">
+      <div className="container-narrow">
         <p>Loading account...</p>
       </div>
     );
@@ -66,50 +87,71 @@ export function AccountScreen({ onBack }: AccountScreenProps) {
 
   if (isAuthenticated && user) {
     return (
-      <div className="container">
-        <h1>Account</h1>
-
-        <p>
-          Signed in as <strong>{user.email}</strong>
-        </p>
-
-        <p>
-          Your BeadArt data can now be synchronized between devices.
-        </p>
-
-        {success && <p role="status">{success}</p>}
-
+      <div className="container-narrow">
         <button
           type="button"
-          onClick={async () => {
-            setError(null);
-            setBusy(true);
-
-            try {
-              await logout();
-            } catch {
-              setError('Could not sign out. Please try again.');
-            } finally {
-              setBusy(false);
-            }
-          }}
-          disabled={busy}
+          className="btn btn-ghost btn-sm"
+          onClick={onBack}
+          style={{ marginBottom: 'var(--space-4)' }}
         >
-          {busy ? 'Signing out...' : 'Sign out'}
+          ← Back
         </button>
 
-        {error && <p role="alert">{error}</p>}
+        <h2>Account</h2>
 
-        <button type="button" onClick={onBack}>
-          Back
-        </button>
+        <div className="surface" style={{ padding: 'var(--space-5)' }}>
+          <p style={{ marginBottom: 'var(--space-2)' }}>
+            Signed in as <strong>{user.email}</strong>
+          </p>
+
+          <p>Your BeadArt data can now be synchronized between devices.</p>
+
+          <SyncBadge status={syncStatus} />
+
+          {success && (
+            <p role="status" style={{ color: 'var(--teal-hover)' }}>
+              {success}
+            </p>
+          )}
+
+          {error && <p role="alert">{error}</p>}
+
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={async () => {
+              setError(null);
+              setBusy(true);
+
+              try {
+                await logout();
+              } catch {
+                setError('Could not sign out. Please try again.');
+              } finally {
+                setBusy(false);
+              }
+            }}
+            disabled={busy}
+          >
+            {busy ? 'Signing out...' : 'Sign out'}
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container">
-      <h1>Account</h1>
+    <div className="container-narrow">
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        onClick={onBack}
+        style={{ marginBottom: 'var(--space-4)' }}
+      >
+        ← Back
+      </button>
+
+      <h2>Account</h2>
 
       <p>
         An account is optional. Your BeadArt patterns are always stored
@@ -121,10 +163,13 @@ export function AccountScreen({ onBack }: AccountScreenProps) {
         palettes between devices.
       </p>
 
-      <div>
+      <div className="segmented" role="group" aria-label="Account mode">
         <button
           type="button"
+          className="segmented-btn"
+          data-active={mode === 'login'}
           aria-label="Switch to sign in"
+          aria-pressed={mode === 'login'}
           onClick={() => {
             setMode('login');
             setError(null);
@@ -136,7 +181,10 @@ export function AccountScreen({ onBack }: AccountScreenProps) {
 
         <button
           type="button"
+          className="segmented-btn"
+          data-active={mode === 'register'}
           aria-label="Switch to create account"
+          aria-pressed={mode === 'register'}
           onClick={() => {
             setMode('register');
             setError(null);
@@ -147,57 +195,54 @@ export function AccountScreen({ onBack }: AccountScreenProps) {
         </button>
       </div>
 
-    <form
-        onSubmit={handleSubmit}
-        aria-label={
-          mode === 'register'
-            ? 'Create account form'
-            : 'Sign in form'
-        }
-      >
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-            autoComplete="email"
-          />
-        </label>
+      <div className="surface" style={{ padding: 'var(--space-5)' }}>
+        <form
+          className="account-form"
+          onSubmit={handleSubmit}
+          aria-label={
+            mode === 'register' ? 'Create account form' : 'Sign in form'
+          }
+        >
+          <div className="field">
+            <label htmlFor="account-email">Email</label>
+            <input
+              id="account-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+              autoComplete="email"
+            />
+          </div>
 
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            minLength={6}
-            autoComplete={
-              mode === 'register'
-                ? 'new-password'
-                : 'current-password'
-            }
-          />
-        </label>
+          <div className="field">
+            <label htmlFor="account-password">Password</label>
+            <input
+              id="account-password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              minLength={6}
+              autoComplete={
+                mode === 'register' ? 'new-password' : 'current-password'
+              }
+            />
+          </div>
 
-        <button type="submit" disabled={busy}>
-          {busy
-            ? mode === 'register'
-              ? 'Creating account...'
-              : 'Signing in...'
-            : mode === 'register'
-              ? 'Create account'
-              : 'Sign in'}
-        </button>
-      </form>
+          <button type="submit" className="btn btn-primary" disabled={busy}>
+            {busy
+              ? mode === 'register'
+                ? 'Creating account...'
+                : 'Signing in...'
+              : mode === 'register'
+                ? 'Create account'
+                : 'Sign in'}
+          </button>
+        </form>
 
-      {error && <p role="alert">{error}</p>}
-
-      <button type="button" onClick={onBack}>
-        Back
-      </button>
+        {error && <p role="alert">{error}</p>}
+      </div>
     </div>
   );
 }
