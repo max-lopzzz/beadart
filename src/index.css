@@ -1195,19 +1195,19 @@ textarea {
   margin-top: var(--space-4);
 }
 
-@container (min-width: 500px) {
+@media (min-width: 500px) {
   .shared-pattern-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-@container (min-width: 700px) {
+@media (min-width: 700px) {
   .shared-pattern-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
-@container (min-width: 900px) {
+@media (min-width: 900px) {
   .shared-pattern-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
