@@ -128,11 +128,6 @@ export async function downloadAccountData(): Promise<{
 export async function syncPattern(pattern: Pattern): Promise<void> {
   const user = getCurrentUser();
 
-  console.log('[syncPattern]', {
-    patternId: pattern.id,
-    user: user?.uid ?? null,
-  });
-
   if (!user) {
     return;
   }
@@ -143,8 +138,6 @@ export async function syncPattern(pattern: Pattern): Promise<void> {
     doc(db, 'users', user.uid, 'patterns', pattern.id),
     patternToFirestore(pattern),
   );
-
-  console.log('[syncPattern] uploaded', pattern.id);
 }
 
 export async function deleteSyncedPattern(
@@ -221,6 +214,7 @@ export async function importAccountDataToLocal(): Promise<void> {
  */
 export function subscribeToAccountPatterns(
   onChange?: () => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const user = getCurrentUser();
 
@@ -259,6 +253,8 @@ export function subscribeToAccountPatterns(
         '[accountRepo] Pattern subscription failed:',
         error,
       );
+
+      onError?.(error);
     },
   );
 }
@@ -268,6 +264,7 @@ export function subscribeToAccountPatterns(
  */
 export function subscribeToAccountPalettes(
   onChange?: () => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const user = getCurrentUser();
 
@@ -302,6 +299,8 @@ export function subscribeToAccountPalettes(
         '[accountRepo] Palette subscription failed:',
         error,
       );
+
+      onError?.(error);
     },
   );
 }
