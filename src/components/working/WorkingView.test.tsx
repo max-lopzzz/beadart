@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { resetDbForTests } from '../../lib/storage/db';
 import { savePalette } from '../../lib/storage/palettesRepo';
@@ -226,6 +226,59 @@ describe('WorkingView', () => {
     expect(
       screen.queryByRole('button', { name: /set selected cells to/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it('shift-clicking a cell selects every connected cell of the same color, and colors them all at once', async () => {
+    await savePalette(palette);
+    await savePattern({
+      ...pattern,
+      id: 'pattern-8',
+      rows: 2,
+      cols: 2,
+      cellColors: [
+        ['Red', 'Red'],
+        ['Blue', 'Red'],
+      ],
+    });
+    const renderThumbnail = vi.fn().mockReturnValue('data:image/png;base64,thumb');
+    render(<WorkingView patternId="pattern-8" onBack={vi.fn()} renderThumbnail={renderThumbnail} />);
+
+    await waitFor(() => screen.getByText('Red × 3'));
+    await userEvent.click(screen.getByRole('button', { name: /edit cells/i }));
+    fireEvent.click(screen.getByLabelText('cell 0-0, color Red'), { shiftKey: true });
+    expect(screen.getByText('3 cells selected')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /set selected cells to blue/i }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('cell 0-0, color Blue')).toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText('cell 0-1, color Blue')).toBeInTheDocument();
+    expect(screen.getByLabelText('cell 1-1, color Blue')).toBeInTheDocument();
+    expect(screen.getByLabelText('cell 1-0, color Blue')).toBeInTheDocument();
+  });
+
+  it('shift-click adds the same-color region to an existing selection rather than replacing it', async () => {
+    await savePalette(palette);
+    await savePattern({
+      ...pattern,
+      id: 'pattern-9',
+      rows: 2,
+      cols: 2,
+      cellColors: [
+        ['Red', 'Red'],
+        ['Blue', 'Blue'],
+      ],
+    });
+    render(<WorkingView patternId="pattern-9" onBack={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('Red × 2'));
+    await userEvent.click(screen.getByRole('button', { name: /edit cells/i }));
+    await userEvent.click(screen.getByLabelText('cell 1-0, color Blue'));
+    expect(screen.getByText('1 cell selected')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('cell 0-0, color Red'), { shiftKey: true });
+    expect(screen.getByText('3 cells selected')).toBeInTheDocument();
   });
 
   it('zooms the grid in and out via the zoom controls, and resets to fit', async () => {
