@@ -6,6 +6,7 @@ import { renderPatternToDataUrl } from '../../lib/image/renderPattern';
 import { findSimilarColors } from '../../lib/color/nearestMatch';
 import { contrastTextColor } from '../../lib/color/contrast';
 import { ZOOM_DEFAULT, isMajorLineStart, zoomIn, zoomOut } from '../../lib/pattern/gridDisplay';
+import { floodFillRegion } from '../../lib/pattern/floodFill';
 import { EMPTY_CELL, Pattern } from '../../types/pattern';
 import { Palette } from '../../types/palette';
 import { ProgressBar } from '../shared/Progress';
@@ -198,6 +199,15 @@ export function WorkingView({
     });
   };
 
+  const selectSameColorRegion = (row: number, col: number) => {
+    const region = floodFillRegion(pattern.cellColors, row, col);
+    setSelectedCells((prev) => {
+      const next = new Set(prev);
+      region.forEach((cell) => next.add(`${cell.row}-${cell.col}`));
+      return next;
+    });
+  };
+
   const handleSetSelectedCellsColor = async (colorName: string) => {
     const cells = Array.from(selectedCells, (key) => {
       const [row, col] = key.split('-').map(Number);
@@ -272,7 +282,9 @@ export function WorkingView({
         <div className="pixel-grid-wrap surface" style={{ padding: 'var(--space-3)' }}>
           <div className="legend-header">
             <p className="hint" style={{ margin: 0 }}>
-              {editMode ? 'Click a cell to change its color.' : 'Made a mistake on a cell?'}
+              {editMode
+                ? 'Click a cell to change its color. Shift-click to select all connected cells of the same color.'
+                : 'Made a mistake on a cell?'}
             </p>
             <button
               className="btn btn-ghost btn-sm"
@@ -364,7 +376,11 @@ export function WorkingView({
                             data-major-col-start={isMajorColStart ? 'true' : 'false'}
                             data-major-row-start={isMajorRowStart ? 'true' : 'false'}
                             style={cellStyle}
-                            onClick={() => toggleCellSelection(rowIndex, colIndex)}
+                            onClick={(e) =>
+                              e.shiftKey
+                                ? selectSameColorRegion(rowIndex, colIndex)
+                                : toggleCellSelection(rowIndex, colIndex)
+                            }
                           />
                         ) : (
                           <div
